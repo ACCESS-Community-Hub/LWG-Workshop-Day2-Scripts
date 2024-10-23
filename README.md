@@ -40,4 +40,4 @@ __GOOD__: Reads the dataset using [xarray](https://docs.xarray.dev/en/stable/) a
 
 The repository is currently structured to reflect the categories set on the working day i.e. ancillaries and meteorological forcing. The structure for this repository (or it's successor) will be open to discussion.
 
-![Repository Structure (and potential further categorisations)](LWG-Workshop-Day2-RepoStructure-v2.png)
+![Repository Structure (and potential further categorisations)](Land-ancillary-creation-RepoStructure-v2.png)
