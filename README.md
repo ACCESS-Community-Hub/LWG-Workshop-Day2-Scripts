@@ -1,6 +1,9 @@
 # About
 
-This repository is intended to store the scripts and tools curated and worked on during the 2024 Land Working Group Workshop. Depending on the outcomes from the workshop, this repository may be either continued or used as a template for the end goal: A repository for storing the many scripts and auxiliary tools used by the land community within Australia as part of their research. This includes processes such as re-gridding, aggregation and disaggregation, statistical analyses and reductions, resampling, as well as tools to prepare datasets for ingestion by either CABLE or JULES.
+This repository is intended to store, where appropriate, the many scripts and tools used by the land community within Australia as part of their research for ancillary data creation. This includes processes such as re-gridding, aggregation and disaggregation, statistical analyses and reductions, resampling, reformatting of datasets for ingestion by either CABLE or JULES.
+The goal is to use these community-shared resources to converge towards a shared infrastructure to create ancillary data.
+
+This repository was first created for the working bee day at the 2024 Land Surface Model Working Group workshop.
 
 # Why
 
