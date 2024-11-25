@@ -184,7 +184,7 @@ if __name__ == "__main__":
         'source': 'Generated from the ACCESS-ESM1.5 restart file at ' +\
                 '/g/data/vk83/configurations/inputs/access-esm1p5/modern/pre-industrial/restart/atmosphere/PI-02.astart-01010101. ' +\
                 'Mapped to CABLE ancillaries via the process described at ' +\
-                '[TODO github location].',
+                'https://github.com/ACCESS-Community-Hub/Land-ancillary-creation/blob/CABLE-offline-as-ACCESS/ancillaries/CABLE_offline_as_ACCESS/convert_ACCESS_to_CABLE_README.md.',
         'author': 'Lachlan Whyborn, lachlan.whyborn@anu.edu.au'
         }
     )

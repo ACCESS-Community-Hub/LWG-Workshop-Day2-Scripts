@@ -65,7 +65,7 @@ N.B. UM fields without a specified short name are given the "temp" placeholder s
 | bch | 90 | CLAPP-HORNBERGER "B" COEFFICIENT | field1381 | Given units of 1. |
 | hyds | 30 | SAT SOIL CONDUCTIVITY AFTER TIMESTEP | field333 | Divide by 1000 to go from kg/m<sup>2</sup>/s to m/s, and given appropriate units. |
 | sucs | 33 | SATURATED SOIL WATER SUCTION      ** | field342 | |
-| rhosoil | N/A | N/A | N/A | Set according to isoil. 1600.0 where isoil=2, 910.0 where isoil=9. Given units of kg/m<sup>3<\sup>. |
+| rhosoil | N/A | N/A | N/A | Set according to isoil. 1600.0 where isoil=2, 910.0 where isoil=9. Given units of kg/m<sup>3</sup>. |
 | cnsd | 32 | THERMAL CONDUCTIVITY AFTER TIMESTEP | field336 | |
 | css | N/A | N/A | N/A | Set according to isoil. 850.0 where isoil=2, 2100.0 where isoil=9. Given units of J/kg/K. |
 | albedo2 | 98 | SNOW-FREE ALBEDO OF SOIL | field1395 | Given units of 1. |
