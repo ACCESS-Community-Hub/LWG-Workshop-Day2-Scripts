@@ -151,15 +151,15 @@ if __name__ == "__main__":
                     'CABLE.'
             )
 
-    parser.add_argument('-i', 'InputFile')
-    parser.add_argument('-o', 'OutputFile')
-    parser.add_argument('--areafile', 'AreaFile')
+    parser.add_argument('-i', '--inputfile', type=str)
+    parser.add_argument('-o', '--outputfile', type=str)
+    parser.add_argument('--areafile', '--areafile', type=str)
 
-    parser.parse_args()
+    args = parser.parse_args()
 
-    InputFile = parser.InputFile
-    OutputFile = parser.OutputFile
-    AreaFile = parser.AreaFile
+    InputFile = args.inputfile
+    OutputFile = args.outputfile
+    AreaFile = args.areafile
 
     # Invoke the conversions
     InDataset = netCDF4.Dataset(InputFile)
