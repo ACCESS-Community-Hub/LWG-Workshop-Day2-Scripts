@@ -1,81 +1,34 @@
 import mule
+import netCDF4
 import numpy
 
-def compute_soil_moisture(FieldsFile, NCFile, dims, attribs):
-    """Compute the soil moisture from the UM file. The UM soil moisture is
-    given in kg/m^3, so we need to convert it to m^3/m^3 by dividing by
-    layer thickness and the density of water."""
+#----------------------------------------------------------------------------#    
 
-    # Retrieve the soil moisture stash items from the attached stash
-    # Should retrieve stash entries for layer 1, 2, 3, 4, 5, 6
-    SoilMoistureStash = FieldsFile.stashmaster.by_regex("SOIL MOISTURE")
+def define_ncvar(Data, NCFile, VarName, dims, attribs):
+    """Add a variable to the given netCDF file, with the given data, name,
+    dims and attributes."""
 
-    # We know the desired size of the system from the dims
-    SoilMoisture = numpy.zeros(
-            tuple(len(NCFile.dimensions[dim]) for dim in dims["SoilMoist"]),
-            dtype = numpy.float32
+    # Set the fill value, depending on the type of the data
+    FillVal = -1.0 if Data.dtype.kind == 'f' else -1
+
+    # Create the variable
+    NCFile.createVariable(
+            VarName,
+            Data.dtype,
+            dims,
+            fill_value = FillVal
             )
 
-    # Thickness of the soil layers
-    SoilThickness = [0.022, 0.058, 0.154, 0.409, 1.085, 6.872]
+    # Assign the data
+    NCFile[VarName][:] = Data
 
-    # Density of water
-    RhoWater = 1000.0
+    # Assign the attributes
+    for (attrib, value) in attribs.items():
+        NCFile[VarName].setncattr(attrib, value)
 
-    # Iterate through the actual stash entries to retrieve stash codes
-    for (Layer, SoilLayer) in enumerate(SoilMoistureStash.values()):
-        StashCode = SoilLayer.item
+#----------------------------------------------------------------------------#    
 
-        # There will be one field with this stash code per PFT- summate them
-        for Field in FieldsFile.fields:
-            if Field.lbuser4 == StashCode:
-                SoilMoisture[:, Layer, :, :] += field.get_data()
-
-    # Mask the array
-    SoilMoisture = numpy.ma.masked_less(SoilMoisture, 0.0)
-
-    # Send it to the ncvar creator
-    define_ncvar(SoilMoisture,
-                 NCFile,
-                 "SoilMoist",
-                 dims["SoilMoist"],
-                 attribs["SoilMoist"]
-                 )
-
-def compute_snow_layer_depth(FieldsFile, NCFile, dims, attribs):
-    """Compute the snow depth of each layer."""
-
-    # Retrieve the snow depth stash items
-    # Should get layer 1, 2, 3
-    SnowDepthStash = FieldsFile.stashmaster.by_regex("SNOW DEPTH LAYER")
-
-    # Initialise the array
-    SnowDepth = numpy.zeros(
-            tuple(len(NCFile.dimensions[dim]) for dim in dims["SnowDepth"]),
-            dtype = numpy.float32
-            )
-
-    # CABLE only has a single snow layer- summate the layers
-    for (Layer, SnowLayer) in enumerate(SnowDepthStash.values()):
-        StashCode = SnowLayer.item
-
-        # Summate over all the PFTs
-        for Field in FieldsFile.fields:
-            if Field.lbuser4 == StashCode:
-                SnowDepth[:, :, :] += Field.get_data()
-
-    # Mask the array
-    SnowDepth = numpy.ma.masked_less(SnowDepth, 0.0)
-
-    # Send it to the ncvar creator
-    define_ncvar(SnowDepth, 
-                 NCFile,
-                 "SnowDepth",
-                 dims["SnowDepth"],
-                 attribs["SnowDepth"]
-                 )
-
-def write_abedo(FieldsFile, NCFile, dims, attribs):
+def write_albedo(FieldsFile, NCFile, dims, attribs):
     """Take the Albedo from the UM file as is."""
     
     # Retrieve the Albedo stash item
@@ -97,24 +50,27 @@ def write_abedo(FieldsFile, NCFile, dims, attribs):
                  NCFile,
                  "albedo2",
                  dims["albedo2"],
-                 attribs)
+                 attribs["albedo2"])
 
     # We also need the albedo variable, although it's not used
     # Use the template of Albedo2 for the mask
     Albedo = numpy.repeat(
-            (numpy.ma.ones_like(Albedo2) * 0.2)[numpy.new_axis, :, :],
-            len(NCFile.dimensions["rad"])
+            (numpy.ma.ones_like(Albedo2) * 0.2)[numpy.newaxis, :, :],
+            len(NCFile.dimensions["rad"]),
+            axis=0
             )
     define_ncvar(Albedo,
                  NCFile,
-                 dims["albedo"],
-                 "albedo",
-                 attribs["albedo"]
+                 "Albedo",
+                 dims["Albedo"],
+                 attribs["Albedo"]
                  )
+
+#----------------------------------------------------------------------------#    
 
 def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
     """Determine the dominant vegetation type and use it to get the LAI,
-    soil moisture, soil temperature, and soil type."""
+    soil moisture, soil temperature, snow depth and soil type."""
 
     # Retrieve the iveg fraction
     PFTStash = FieldsFile.stashmaster.by_regex("FRACTIONS OF SURFACE TYPES")
@@ -123,29 +79,36 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
     StashCode = list(PFTStash.values())[0].item
 
     # We're going to need to manually iterate through indices
-    nLat, nLon = len(dims["iveg"]["latitude"]), len(dims["iveg"]["longitude"])
+    nLat = len(NCFile.dimensions["latitude"])
+    nLon = len(NCFile.dimensions["longitude"])
 
     # Yank out the arrays corresponding to the land fractions first and place
     # them in a single array
-    PFTArrays = numpy.array((17, nLat, nLon), dtype = numpy.float32)
+    PFTArrays = numpy.zeros((17, nLat, nLon), dtype = numpy.float32)
 
     for Field in FieldsFile.fields:
         if Field.lbuser4 == StashCode:
-            PFTArrays[Field.lbuser5, :, :] = Field.get_data())
+            PFTArrays[Field.lbuser5-1, :, :] = Field.get_data()
 
     # Build the mask that we will use- in most instances we'll also want to
     # broadcast it over another dimension.
-    Mask = numpy.ma.masked_less_equal(numpy.sum(PFTArrays, axis=0) <= 0.0)
+    Mask = numpy.sum(PFTArrays, axis=0) <= 0.0
 
     # Now we want the max index across each page of the array (+1 due to 0
     # based indexing).
-    PFTs[:, :] = numpy.argmax(PFTArrays, axis=0) + 1
+    PFTs = numpy.argmax(PFTArrays, axis=0) + 1
 
     # Now apply the mask, based on the sum of the PFT fractions
     PFTs = numpy.ma.masked_array(PFTs, mask=Mask)
 
     # Send it to the ncvar creator
-    define_ncvar(PFTs, NCFile, "iveg", dims["iveg"], attribs["iveg"])
+    define_ncvar(
+            PFTs,
+            NCFile,
+            "iveg",
+            dims["iveg"],
+            attribs["iveg"]
+            )
 
     # Now use this information to get the attributes which are dependent on
     # the PFT- this is LAI and isoil (with rhosoil and css being dependent on
@@ -188,7 +151,7 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
         # Scale the layer by the thickness and water density
         SoilMoisture[:, Layer, :, :] /= (SoilThickness[Layer] * RhoWater)
 
-    # Apply the mask- anywhere
+    # Apply the mask- anywhere the value is less than 0
     SoilMoisture = numpy.ma.masked_less(SoilMoisture, 0.0)
 
     define_ncvar(
@@ -196,7 +159,7 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
             NCFile,
             "SoilMoist",
             dims["SoilMoist"],
-            attribs["SoilMoist"],
+            attribs["SoilMoist"]
             )
 
     # Now do soil temperature, in the same manner as soil moisture
@@ -238,9 +201,51 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
             attribs["SoilTemp"],
             )
 
+    # Now do snow depth- ACCESS-ESM1.5 has 3 snow layers, but CABLE only has 1.
+    # Retrieve the snow depth stash items
+    # Should get layer 1, 2, 3
+    SnowDepthStash = FieldsFile.stashmaster.by_regex("SNOW DEPTH LAYER")
+
+    # Initialise the array- don't initialise to -1.0, as we want to summate
+    # over layers
+    SnowDepth = numpy.zeros(
+            tuple(len(NCFile.dimensions[dim]) for dim in dims["SnowDepth"]),
+            dtype = numpy.float32
+            )
+
+    for (Layer, SnowLayer) in enumerate(SnowDepthStash.values()):
+        StashCode = SnowLayer.item
+
+        # Get the arrays corresponding to each PFT
+        SnowLayerArrays = []
+        for Field in FieldsFile.fields:
+            if Field.lbuser4 == StashCode:
+                SnowLayerArrays.append(Field.get_data())
+
+        # Iterate through the valid indices of the PFT array, summating the
+        # snow depth
+        for (i, j), PFT in numpy.ma.ndenumerate(PFTs):
+            SnowDepth[:, i, j] += SnowLayerArrays[PFT-1][i, j]
+
+    # Apply the mask- since we didn't initialise the array to -1.0, we can't
+    # just use numpy.ma.masked_less. Inherit the mask from the PFT array, and
+    # broadcast it to the desired shape by repeating over the time axis.
+    SnowDepth = numpy.ma.masked_array(
+            SnowDepth,
+            mask=numpy.repeat(Mask[numpy.newaxis, :, :], 12, axis=0)
+            )
+
+    define_ncvar(
+            SnowDepth,
+            NCFile,
+            "SnowDepth",
+            dims["SnowDepth"],
+            attribs["SnowDepth"]
+            )
+
     # LAI
     # Retrieve the LAI stash item
-    LAIStash = FieldsFile.stashmaster.by_regex("LEAF AREA INDEX")
+    LAIStash = FieldsFile.stashmaster.by_regex("CASA LEAF AREA INDEX")
 
     # Should be a single entry- retrieve the stash code
     StashCode = list(LAIStash.values())[0].item
@@ -291,7 +296,38 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
     css = numpy.ma.where(iSoil == 2, 850.0, 2100.0)
 
     define_ncvar(css, NCFile, "css", dims["css"], attribs["css"])
-    
+
+#----------------------------------------------------------------------------#    
+
+def convert_soilorder_to_int(FieldsFile, NCFile, dims, attribs):
+    """Convert the soil order from floating point to integer."""
+
+    # Get the stash entry associated
+    SoilOrderStash = FieldsFile.stashmaster.by_regex("CASA SOIL ORDER")
+    StashCode = list(SoilOrderStash.values())[0].item
+
+    # Get the field associated with the stash code
+    for Field in FieldsFile.fields:
+        if Field.lbuser4 == StashCode:
+            break
+
+    # Convert it to int
+    SoilOrder = Field.get_data().astype(numpy.int32)
+
+    # Mask the array
+    SoilOrder = numpy.ma.masked_less(SoilOrder, 1)
+
+    # Pass it to the variable creator
+    define_ncvar(
+            SoilOrder,
+            NCFile,
+            "SoilOrder",
+            dims["SoilOrder"],
+            attribs["SoilOrder"]
+            )
+
+#----------------------------------------------------------------------------#    
+
 def direct_conversions(FieldsFile, NCFile, dims, attribs):
     """Convert all variables that are a 1:1 conversion, with no level
     dimension, from a UM field to a CABLE field."""
@@ -300,11 +336,11 @@ def direct_conversions(FieldsFile, NCFile, dims, attribs):
     mappings = {
             "GRIDBOX AREAS": "area",
             "NITROGEN FIXATION": "Nfix",
-            "PHOSPHOROUS FROM WEATHERING":, "Pwea",
-            "PHOSPHOROUS FROM DUST": "Pdust",
-            "Dust parent soil clay fraction (anc)":, "clay",
-            "Dust parent soil silt fraction (anc)":, "silt",
-            "Dust parent soil sand fraction (anc)":, "sand",
+            "PHOSPHORUS FROM WEATHERING": "Pwea",
+            "PHOSPHORUS FROM DUST": "Pdust",
+            "Dust parent soil clay fraction": "clay",
+            "Dust parent soil silt fraction": "silt",
+            "Dust parent soil sand fraction": "sand",
             "VOL SMC AT WILTING AFTER TIMESTEP": "swilt",
             "VOL SMC AT CRIT PT AFTER TIMESTEP": "sfc",
             "VOL SMC AT SATURATION AFTER TIMESTEP": "ssat",
@@ -324,13 +360,19 @@ def direct_conversions(FieldsFile, NCFile, dims, attribs):
             if Field.lbuser4 == StashCode:
                 break
 
+        # Mask the values in a reasonable range- UM seems to set missing
+        # float values to 1e9?
+        Data = numpy.ma.masked_outside(Field.get_data(), 0.0, 1e6)
+
         define_ncvar(
-                Field.get_data(),
+                Data,
                 NCFile,
                 CABLEVar,
                 dims[CABLEVar],
                 attribs[CABLEVar]
                 )
+
+#----------------------------------------------------------------------------#    
 
 def scaling_conversions(FieldsFile, NCFile, dims, attribs, scalings):
     """Perform all conversions that require scalar/unit conversions to go from
@@ -338,7 +380,7 @@ def scaling_conversions(FieldsFile, NCFile, dims, attribs, scalings):
 
     # Current variables that fit this description are Ndep and hyds
     mappings = {
-            "NITROGEN DEPOSITION": "Ndep",
+            "CASA NITROGEN DEPOSITION": "Ndep",
             "SAT SOIL CONDUCTIVITY AFTER TIMESTEP": "hyds"
             }
 
@@ -360,10 +402,13 @@ def scaling_conversions(FieldsFile, NCFile, dims, attribs, scalings):
                 attribs[CABLEVar]
                 )
 
+#----------------------------------------------------------------------------#    
+
 if __name__ == "__main__":
     # Start by opening the desired UM fields file and attaching the stash
     FieldsFile = mule.FieldsFile.from_file("PI-02.astart-01010101")
-    UMStash = mule.STASHmaster.from_file("STASHmaster_A")
+    # Only take section 0, other sections are diagnostics
+    UMStash = mule.STASHmaster.from_file("STASHmaster_A").by_section(0)
     FieldsFile.attach_stashmaster_info(UMStash)
 
     # Open the NCfile to write to
@@ -389,7 +434,7 @@ if __name__ == "__main__":
     # Add top level attributes
     NCAttribs = {
             "source": "ACCESS-ESM1.5 atmosphere restart file from " +\
-                    "CMIP6 pre-industrial runs."
+                    "CMIP6 pre-industrial runs.",
             "comments": "Converted from the UM fields file on Gadi at " +\
                     "/g/data/vk83/configurations/inputs/access-esm1p5/modern/pre-industrial/restart/atmosphere/PI-02.astart-01010101 " +\
                     "with the python script at [SCRIPT LOCATION HERE].",
@@ -402,23 +447,23 @@ if __name__ == "__main__":
     # Start by adding dimension variables
     NCFile.createVariable(
             "longitude",
-            TYPEMAP[numpy.float32],
-            NCDimensions["longitude"]
+            'f4',
+            ('longitude',)
             )
 
     NCFile.createVariable(
             "latitude",
-            TYPEMAP[numpy.float32],
-            NCDimensions["latitude"]
+            'f4',
+            ('latitude',)
             )
 
     # Remember to map longitude from 0.0 -> 360.0 to -180.0 -> 180.0
     Longitudes = numpy.linspace(0.0, 360.0, 192, endpoint=False)
     Longitudes = numpy.where(Longitudes > 180.0, -360 + Longitudes, Longitudes)
-    NCFile["longitudes"][:] = Longitudes
+    NCFile["longitude"][:] = Longitudes
 
     Latitudes = numpy.linspace(-90.0, 90.0, 145)
-    NCFile["latitudes"][:] = Latitudes
+    NCFile["latitude"][:] = Latitudes
 
     # Define a single dictionary which contains the dimension information for
     # all the variables
@@ -494,20 +539,38 @@ if __name__ == "__main__":
                 },
             "SoilMoist" : {
                 "long_name"     : "Soil moisture in a layer",
-                "units":        : "m^3/m^3",
+                "units"         : "m^3/m^3",
                 "missing_value" : -1.0,
                 "comments"      : "Converted from kg/m^2 to m^3/m^3 by " +\
                         "dividing by layer thickness and water density."
                 },
             "SoilTemp"  : {
                 "long_name"     : "Soil temperature in a layer",
-                "units":        : "K",
+                "units"         : "K",
                 "missing_value" : -1.0
                 },
             "SnowDepth" : {
                 "long_name"     : "Depth of snow",
                 "units"         : "m",
                 "missing_value" : -1.0
+                },
+            "Albedo"    : {
+                "long_name"     : "Snow free albedo of soil",
+                "units"         : 1,
+                "missing_value" : -1.0,
+                "comments"      : "Set to 0.2 everywhere, as it is not " +\
+                        "used in CABLE but it is checked."
+                },
+            "LAI"       : {
+                "long_name"     : "Leaf area index",
+                "units"         : 1,
+                "missing_value" : -1.0
+                },
+            "SoilOrder" : {
+                "long_name"     : "Soil order",
+                "units"         : 1,
+                "missing_value" : -1,
+                "comments"      : "Converted to integer from ACCESS restart."
                 },
             "Ndep"      : {
                 "long_name"     : "annual Nitrogen deposition rate",
@@ -593,7 +656,7 @@ if __name__ == "__main__":
                 "units"         : "J/kg/K",
                 "missing_value" : -1.0,
                 "comments"      : "Set to 850.0 where isoil=2, " +\
-                        "2100.0 where isoil=9".
+                        "2100.0 where isoil=9."
                 },
             "albedo2"   : {
                 "long_name"     : "Snow-free albedo of soil",
@@ -602,15 +665,47 @@ if __name__ == "__main__":
                 }
             }
 
-            
+    scalings = {
+            "Ndep"  : 1.0 / 365.0,
+            "hyds"  : 1.0 / 1000.0
+            }
 
-
-
-    # Now we can call the custom made functions for each variable
-    compute_soil_moisture(
+    # Call the variable builders
+    compute_iveg_and_dependent_vars(
             FieldsFile,
             NCFile,
+            VarDimensions,
+            VarAttribs
+            )
+
+    write_albedo(
+            FieldsFile,
+            NCFile,
+            VarDimensions,
+            VarAttribs
+            )
+
+    convert_soilorder_to_int(
+            FieldsFile,
+            NCFile,
+            VarDimensions,
+            VarAttribs
+            )
+
+    direct_conversions(
+            FieldsFile,
+            NCFile,
+            VarDimensions,
+            VarAttribs
+            )
+
+    scaling_conversions(
+            FieldsFile,
+            NCFile,
+            VarDimensions,
+            VarAttribs,
+            scalings
+            )
+             
+
             
-
-
-    
