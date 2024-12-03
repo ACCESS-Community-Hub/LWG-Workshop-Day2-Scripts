@@ -246,12 +246,12 @@ python ${ANTS_SRC_PATH}/Apps/SoilRoughness/ancil_soil_roughness.py \
        --output ${output} \
        --use-new-saver ${source}
 
-# append.py appends the soil parameter ancillary [qrparm.soil_cci.nc] with 
-# soil roughness [output]. This is done in Siyuan's offline ancil suite, but not
-# done in the RAS suite. Therefore the merged and unmerged versions are retained.
-# more documentation is available in the file (no online documentation)
-python ${ANTS_SRC_PATH}/app/ancil_soil_roughness/bin/append.py \
-       ${ANCIL_TARGET_PATH}/qrparm.soil_cci.nc ${output}.nc -o ${merged_output}
+# # append.py appends the soil parameter ancillary [qrparm.soil_cci.nc] with 
+# # soil roughness [output]. This is done in Siyuan's offline ancil suite, but not
+# # done in the RAS suite. Therefore the merged and unmerged versions are retained.
+# # more documentation is available in the file (no online documentation)
+# python ${ANTS_SRC_PATH}/app/ancil_soil_roughness/bin/append.py \
+#        ${ANCIL_TARGET_PATH}/qrparm.soil_cci.nc ${output}.nc -o ${merged_output}
 
 # remove intermediate or unused files
 rm ${ANCIL_TARGET_PATH}/qrparm.landfrac.nc
