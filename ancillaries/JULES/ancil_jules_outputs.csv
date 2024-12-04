@@ -1,0 +1,37 @@
+#,variable,units,standard_name,long_name,file,dimensions,dim levels,dim long_name,dim units,time levels,time name,time units,stash,STASH description
+1,land_binary_mask,1,land_binary_mask,-,qrparm.mask.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i030,Land mask (No halo) (LAND=TRUE)
+2,land_area_fraction,1,land_area_fraction,-,qrparm.landfrac.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i505,Land fraction in grid box
+3,vegetation_area_fraction,1,vegetation_area_fraction,-,qrparm.veg.frac_cci.nc,"dim0, latitude, longitude",9,pseudo_level,1,9,pseudo_level,1,m01s00i216,Fractions of surface types
+4,canopy_height,m,canopy_height,-,qrparm.veg.func.nc,"time, dim1, latitude, longitude",5,pseudo_level,1,12,time,days since 1970-01-01 00:00:00,m01s00i218,CANOPY HEIGHT OF PLANT FUNC TYPES M
+5,leaf_area_index,1,leaf_area_index,-,qrparm.veg.func.nc,"time, dim1, latitude, longitude",5,pseudo_level,1,12,time,days since 1970-01-01 00:00:00,m01s00i217,LEAF AREA INDEX OF PLANT FUNC TYPES
+6,land_binary_mask,1,land_binary_mask,-,qrparm.mask_sea.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i030,SEEMS IDENTICAL TO ABOVE
+7,sm_wilt,m3 m-3,volume_fraction_of_condensed_water_in_soil_at_wilting_point,volumetric soil moisture content at the wilting point,qrparm.soil_cci.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i040,VOL SMC AT WILTING AFTER TIMESTEP
+8,sm_crit,m3 m-3,volume_fraction_of_condensed_water_in_soil_at_critical_point,volumetric soil moisture content at the critical point at which soil moisture stress starts to reduce transpiration,qrparm.soil_cci.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i041,VOL SMC AT CRIT PT AFTER TIMESTEP
+9,sm_sat,m3 m-3,soil_porosity,volumetric soil moisture content at saturation,qrparm.soil_cci.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i043,VOL SMC AT SATURATION AFTER TIMESTEP
+10,b,1,-,Brooks-Corey exponent in the soil hydraulic characteristics,qrparm.soil_cci.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i207,"CLAPP-HORNBERGER ""B"" COEFFICIENT"
+11,hcon,W m-1 K-1,soil_thermal_conductivity,dry thermal conductivity (lambda),qrparm.soil_cci.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i047,THERMAL CONDUCTIVITY AFTER TIMESTEP
+12,satcon,kg m-2 s-1,soil_hydraulic_conductivity_at_saturation,hydraulic conductivity at saturation,qrparm.soil_cci.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i044,SAT SOIL CONDUCTIVITY AFTER TIMESTEP
+13,hcap,J m-3 K-1,soil_thermal_capacity,dry heat capacity,qrparm.soil_cci.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i046,THERMAL CAPACITY AFTER TIMESTEP
+14,sathh,m,soil_suction_at_saturation,absolute value of the soil matric suction at saturation,qrparm.soil_cci.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i048,SATURATED SOIL WATER SUCTION
+15,soil_albedo,1,soil_albedo,-,qrparm.soil_cci.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i220,SNOW-FREE ALBEDO OF SOIL
+16,soil_carb,kg m-2,soil_carbon_content,amount of soil carbon in the soil,qrparm.soil_cci.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i223,SOIL CARBON CONTENT KG C / M2
+17,BD,kg m-3,-,bulk density of the soil,qrparm.soil_cci.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i008,SOIL BULK DENSITY KG/M3 (retd)
+18,T_CLAY,m3 m-3,volume_fraction_of_clay_in_soil,volume_fraction_of_clay_in_soil,qrparm.soil_cci.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i418,Dust parent soil clay fraction (anc)
+19,T_SILT,m3 m-3,volume_fraction_of_silt_in_soil,volume_fraction_of_silt_in_soil,qrparm.soil_cci.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i419,Dust parent soil silt fraction (anc)
+20,T_SAND,m3 m-3,volume_fraction_of_sand_in_soil,volume_fraction_of_sand_in_soil,qrparm.soil_cci.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i420,Dust parent soil sand fraction (anc)
+21,surface_roughness_length,m,surface_roughness_length,soil_surface_roughness_length,qrparm.soilz0.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i097,BARE SOIL MOMENTUM ROUGHNESS LENGTH
+22,mass_fraction_of_soil_particles_in_ukmo_division1,kg/kg,-,mass_fraction_of_soil_particles_in_ukmo_division1,qrparm.soil.dust.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i421,Dust soil mass fraction div 1 (anc)
+23,mass_fraction_of_soil_particles_in_ukmo_division2,kg/kg,-,mass_fraction_of_soil_particles_in_ukmo_division2,qrparm.soil.dust.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i422,Dust soil mass fraction div 2 (anc)
+24,mass_fraction_of_soil_particles_in_ukmo_division3,kg/kg,-,mass_fraction_of_soil_particles_in_ukmo_division3,qrparm.soil.dust.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i423,Dust soil mass fraction div 3 (anc)
+25,mass_fraction_of_soil_particles_in_ukmo_division4,kg/kg,-,mass_fraction_of_soil_particles_in_ukmo_division4,qrparm.soil.dust.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i424,Dust soil mass fraction div 4 (anc)
+26,mass_fraction_of_soil_particles_in_ukmo_division5,kg/kg,-,mass_fraction_of_soil_particles_in_ukmo_division5,qrparm.soil.dust.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i425,Dust soil mass fraction div 5 (anc)
+27,mass_fraction_of_soil_particles_in_ukmo_division6,kg/kg,-,mass_fraction_of_soil_particles_in_ukmo_division6,qrparm.soil.dust.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i426,Dust soil mass fraction div 6 (anc)
+28,volume_fraction_of_clay_in_soil,m3 m-3,volume_fraction_of_clay_in_soil,volume_fraction_of_clay_in_soil,qrparm.soil.dust.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i418,Dust parent soil clay fraction (anc)
+29,volume_fraction_of_silt_in_soil,m3 m-3,volume_fraction_of_silt_in_soil,volume_fraction_of_silt_in_soil,qrparm.soil.dust.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i419,Dust parent soil silt fraction (anc)
+30,volume_fraction_of_sand_in_soil,m3 m-3,volume_fraction_of_sand_in_soil,volume_fraction_of_sand_in_soil,qrparm.soil.dust.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i420,Dust parent soil sand fraction (anc)
+31,surface_diffuse_albedo_assuming_no_snow,1,-,surface_diffuse_albedo_assuming_no_snow,qrclim.land.nc,"time, latitude, longitude",-,-,-,12,time,days since 1970-01-01 00:00:00,m01s00i243,OBS/CLIM SNOW-FREE SURF SW ALBEDO
+32,surface_diffuse_albedo_of_near_infra_red_radiation_assuming_no_snow,1,-,surface_diffuse_albedo_of_near_infra_red_radiation_assuming_no_snow,qrclim.land.nc,"time, latitude, longitude",-,-,-,12,time,days since 1970-01-01 00:00:00,m01s00i245,OBS/CLIM SNOW-FREE SURF NIR ALBEDO
+33,surface_diffuse_albedo_of_photosynthetically_active_radiation_assuming_no_snow,1,-,surface_diffuse_albedo_of_photosynthetically_active_radiation_assuming_no_snow,qrclim.land.nc,"time, latitude, longitude",-,-,-,12,time,days since 1970-01-01 00:00:00,m01s00i244,OBS/CLIM SNOW-FREE SURF VIS ALBEDO
+34,topidx,1,-,mean topographic index,qrparm.hydtop.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i274,MEAN TOPOGRAPHIC INDEX
+35,standard_deviation_topographic_index1,1,-,standard deviation topographic index,qrparm.hydtop.nc,"latitude, longitude",-,-,-,-,-,-,m01s00i275,STANDARD DEVN IN TOPOGRAPHIC INDEX
+
