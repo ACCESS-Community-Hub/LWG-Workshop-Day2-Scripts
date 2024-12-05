@@ -1,34 +1,42 @@
 import mule
-import netCDF4
+import xarray
 import numpy
 
 #----------------------------------------------------------------------------#    
 
-def define_ncvar(Data, NCFile, VarName, dims, attribs):
+def define_ncvar(Data, NCDataset, VarName, dims, attribs):
     """Add a variable to the given netCDF file, with the given data, name,
     dims and attributes."""
 
     # Set the fill value, depending on the type of the data
     FillVal = -1.0 if Data.dtype.kind == 'f' else -1
+    numpy.ma.set_fill_value(Data, FillVal)
 
     # Create the variable
-    NCFile.createVariable(
-            VarName,
-            Data.dtype,
-            dims,
-            fill_value = FillVal
-            )
-
-    # Assign the data
-    NCFile[VarName][:] = Data
+    NCDataset[VarName] = (dims, Data)
 
     # Assign the attributes
-    for (attrib, value) in attribs.items():
-        NCFile[VarName].setncattr(attrib, value)
+    NCDataset[VarName].assign_attrs(attribs)
 
 #----------------------------------------------------------------------------#    
 
-def write_albedo(FieldsFile, NCFile, dims, attribs):
+def get_area(AreaFile, NCDataset, dims, attribs):
+    """Get the area attribute from a different netCDF file."""
+
+    # Assuming we have areacella attribute
+    Area = AreaFile["areacella"].to_numpy()
+
+    define_ncvar(
+            Area,
+            NCDataset,
+            "area",
+            dims["area"],
+            attribs["area"]
+            )
+    
+#----------------------------------------------------------------------------#    
+
+def write_albedo(FieldsFile, NCDataset, dims, attribs):
     """Take the Albedo from the UM file as is."""
     
     # Retrieve the Albedo stash item
@@ -47,7 +55,7 @@ def write_albedo(FieldsFile, NCFile, dims, attribs):
 
     # Send it to the ncvar creator
     define_ncvar(Albedo2,
-                 NCFile,
+                 NCDataset,
                  "albedo2",
                  dims["albedo2"],
                  attribs["albedo2"])
@@ -56,11 +64,11 @@ def write_albedo(FieldsFile, NCFile, dims, attribs):
     # Use the template of Albedo2 for the mask
     Albedo = numpy.repeat(
             (numpy.ma.ones_like(Albedo2) * 0.2)[numpy.newaxis, :, :],
-            len(NCFile.dimensions["rad"]),
+            3,
             axis=0
             )
     define_ncvar(Albedo,
-                 NCFile,
+                 NCDataset,
                  "Albedo",
                  dims["Albedo"],
                  attribs["Albedo"]
@@ -68,7 +76,7 @@ def write_albedo(FieldsFile, NCFile, dims, attribs):
 
 #----------------------------------------------------------------------------#    
 
-def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
+def compute_iveg_and_dependent_vars(FieldsFile, NCDataset, dims, attribs):
     """Determine the dominant vegetation type and use it to get the LAI,
     soil moisture, soil temperature, snow depth and soil type."""
 
@@ -79,8 +87,8 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
     StashCode = list(PFTStash.values())[0].item
 
     # We're going to need to manually iterate through indices
-    nLat = len(NCFile.dimensions["latitude"])
-    nLon = len(NCFile.dimensions["longitude"])
+    nLat = NCDataset.sizes["latitude"]
+    nLon = NCDataset.sizes["longitude"]
 
     # Yank out the arrays corresponding to the land fractions first and place
     # them in a single array
@@ -104,7 +112,7 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
     # Send it to the ncvar creator
     define_ncvar(
             PFTs,
-            NCFile,
+            NCDataset,
             "iveg",
             dims["iveg"],
             attribs["iveg"]
@@ -121,7 +129,7 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
     # We know the desired size of the system from the dims- initialise it with
     # values of -1.0 for easier masking
     SoilMoisture = numpy.ones(
-            tuple(len(NCFile.dimensions[dim]) for dim in dims["SoilMoist"]),
+            tuple(NCDataset.sizes[dim] for dim in dims["SoilMoist"]),
             dtype = numpy.float32
             ) * -1.0
     
@@ -156,7 +164,7 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
 
     define_ncvar(
             SoilMoisture,
-            NCFile,
+            NCDataset,
             "SoilMoist",
             dims["SoilMoist"],
             attribs["SoilMoist"]
@@ -169,7 +177,7 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
     # We know the desired size of the system from the dims- initialise it with
     # values of -1.0 for easier masking
     SoilTemp = numpy.ones(
-            tuple(len(NCFile.dimensions[dim]) for dim in dims["SoilTemp"]),
+            tuple(NCDataset.sizes[dim] for dim in dims["SoilTemp"]),
             dtype = numpy.float32
             ) * -1.0
     
@@ -195,7 +203,7 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
 
     define_ncvar(
             SoilTemp,
-            NCFile,
+            NCDataset,
             "SoilTemp",
             dims["SoilTemp"],
             attribs["SoilTemp"],
@@ -209,7 +217,7 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
     # Initialise the array- don't initialise to -1.0, as we want to summate
     # over layers
     SnowDepth = numpy.zeros(
-            tuple(len(NCFile.dimensions[dim]) for dim in dims["SnowDepth"]),
+            tuple(NCDataset.sizes[dim] for dim in dims["SnowDepth"]),
             dtype = numpy.float32
             )
 
@@ -237,7 +245,7 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
 
     define_ncvar(
             SnowDepth,
-            NCFile,
+            NCDataset,
             "SnowDepth",
             dims["SnowDepth"],
             attribs["SnowDepth"]
@@ -252,7 +260,7 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
 
     # Initialise the array of LAI values
     LAI = numpy.zeros(
-            tuple(len(NCFile.dimensions[dim]) for dim in dims["LAI"]),
+            tuple(NCDataset.sizes[dim] for dim in dims["LAI"]),
             dtype = numpy.float32
             )
 
@@ -273,12 +281,12 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
             mask=numpy.repeat(Mask[numpy.newaxis, :, :], 12, axis=0)
             )
 
-    define_ncvar(LAI, NCFile, "LAI", dims["LAI"], attribs["LAI"])
+    define_ncvar(LAI, NCDataset, "LAI", dims["LAI"], attribs["LAI"])
 
     # Now do isoil- 2 everywhere except where PFT=19, where isoil=9
     iSoil = numpy.ma.where(PFTs == 17, 9, 2)
 
-    define_ncvar(iSoil, NCFile, "isoil", dims["isoil"], attribs["isoil"])
+    define_ncvar(iSoil, NCDataset, "isoil", dims["isoil"], attribs["isoil"])
 
     # Variables that depend on isoil
     # rhosoil
@@ -286,7 +294,7 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
 
     define_ncvar(
             rhoSoil,
-            NCFile,
+            NCDataset,
             "rhosoil",
             dims["rhosoil"],
             attribs["rhosoil"]
@@ -295,11 +303,11 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCFile, dims, attribs):
     # css
     css = numpy.ma.where(iSoil == 2, 850.0, 2100.0)
 
-    define_ncvar(css, NCFile, "css", dims["css"], attribs["css"])
+    define_ncvar(css, NCDataset, "css", dims["css"], attribs["css"])
 
 #----------------------------------------------------------------------------#    
 
-def convert_soilorder_to_int(FieldsFile, NCFile, dims, attribs):
+def convert_soilorder_to_int(FieldsFile, NCDataset, dims, attribs):
     """Convert the soil order from floating point to integer."""
 
     # Get the stash entry associated
@@ -320,7 +328,7 @@ def convert_soilorder_to_int(FieldsFile, NCFile, dims, attribs):
     # Pass it to the variable creator
     define_ncvar(
             SoilOrder,
-            NCFile,
+            NCDataset,
             "SoilOrder",
             dims["SoilOrder"],
             attribs["SoilOrder"]
@@ -328,13 +336,12 @@ def convert_soilorder_to_int(FieldsFile, NCFile, dims, attribs):
 
 #----------------------------------------------------------------------------#    
 
-def direct_conversions(FieldsFile, NCFile, dims, attribs):
+def direct_conversions(FieldsFile, NCDataset, dims, attribs):
     """Convert all variables that are a 1:1 conversion, with no level
     dimension, from a UM field to a CABLE field."""
 
     # Build a dictionary of conversion mappings
     mappings = {
-            "GRIDBOX AREAS": "area",
             "NITROGEN FIXATION": "Nfix",
             "PHOSPHORUS FROM WEATHERING": "Pwea",
             "PHOSPHORUS FROM DUST": "Pdust",
@@ -366,7 +373,7 @@ def direct_conversions(FieldsFile, NCFile, dims, attribs):
 
         define_ncvar(
                 Data,
-                NCFile,
+                NCDataset,
                 CABLEVar,
                 dims[CABLEVar],
                 attribs[CABLEVar]
@@ -374,7 +381,7 @@ def direct_conversions(FieldsFile, NCFile, dims, attribs):
 
 #----------------------------------------------------------------------------#    
 
-def scaling_conversions(FieldsFile, NCFile, dims, attribs, scalings):
+def scaling_conversions(FieldsFile, NCDataset, dims, attribs, scalings):
     """Perform all conversions that require scalar/unit conversions to go from
     UM fields to CABLE fields."""
 
@@ -396,7 +403,7 @@ def scaling_conversions(FieldsFile, NCFile, dims, attribs, scalings):
 
         define_ncvar(
                 Field.get_data() * scalings[CABLEVar],
-                NCFile,
+                NCDataset,
                 CABLEVar,
                 dims[CABLEVar],
                 attribs[CABLEVar]
@@ -411,11 +418,9 @@ if __name__ == "__main__":
     UMStash = mule.STASHmaster.from_file("STASHmaster_A").by_section(0)
     FieldsFile.attach_stashmaster_info(UMStash)
 
-    # Open the NCfile to write to
-    NCFile = netCDF4.Dataset(
-            "ACCESS-ESM1p5-gridinfo-1p875x1p25-CABLE.nc",
-            "w",
-            format="NETCDF4"
+    AreaFile = xarray.open_dataset(
+            "areacella_fx_ACCESS-ESM1-5_piControl_r1i1p1f1_gn.nc",
+            engine="netcdf4"
             )
 
     # Define the dimensions of the NetCDF file
@@ -428,8 +433,27 @@ if __name__ == "__main__":
             "longitude": 192
             }
 
-    for Dimension, DimLength in NCDimensions.items():
-        NCFile.createDimension(Dimension, DimLength)
+    # Remember to map longitude from 0.0 -> 360.0 to -180.0 -> 180.0
+    Longitudes = numpy.linspace(0.0, 360.0, 192, endpoint=False)
+    Longitudes = numpy.where(Longitudes > 180.0, -360 + Longitudes, Longitudes)
+    Latitudes = numpy.linspace(-90.0, 90.0, 145)
+
+    # For some reason xarray doesn't accept coordinates without values in the
+    # constuctor (what an awesome package), need to fill the other dimensions
+    # with something
+    rad = list(range(3))
+    time = list(range(12))
+    patch = list(range(1))
+    soil = list(range(6))
+
+    NCCoords = {
+            "longitude": (["longitude"], Longitudes),
+            "latitudes": (["latitude"], Latitudes),
+            "patch": (["patch"], patch),
+            "soil": (["soil"], soil),
+            "rad": (["rad"], rad),
+            "time": (["time"], time)
+            }
 
     # Add top level attributes
     NCAttribs = {
@@ -441,29 +465,11 @@ if __name__ == "__main__":
             "contact": "lachlan.whyborn@anu.edu.au"
             }
 
-    for AttribName, AttribContent in NCAttribs.items():
-        NCFile.setncattr(AttribName, AttribContent)
-
-    # Start by adding dimension variables
-    NCFile.createVariable(
-            "longitude",
-            'f4',
-            ('longitude',)
+    # Apparently you can't give dimensions to a Dataset?
+    NCDataset = xarray.Dataset(
+            coords = NCCoords,
+            attrs = NCAttribs
             )
-
-    NCFile.createVariable(
-            "latitude",
-            'f4',
-            ('latitude',)
-            )
-
-    # Remember to map longitude from 0.0 -> 360.0 to -180.0 -> 180.0
-    Longitudes = numpy.linspace(0.0, 360.0, 192, endpoint=False)
-    Longitudes = numpy.where(Longitudes > 180.0, -360 + Longitudes, Longitudes)
-    NCFile["longitude"][:] = Longitudes
-
-    Latitudes = numpy.linspace(-90.0, 90.0, 145)
-    NCFile["latitude"][:] = Latitudes
 
     # Define a single dictionary which contains the dimension information for
     # all the variables
@@ -671,41 +677,50 @@ if __name__ == "__main__":
             }
 
     # Call the variable builders
+
+    # Need to get area from elsewhere- there is a GRIDBOX AREA field
+    # in the UM file, but for some reason it's an array of 0.0?
+    get_area(
+            AreaFile,
+            NCDataset,
+            VarDimensions,
+            VarAttribs
+            )
+
     compute_iveg_and_dependent_vars(
             FieldsFile,
-            NCFile,
+            NCDataset,
             VarDimensions,
             VarAttribs
             )
 
     write_albedo(
             FieldsFile,
-            NCFile,
+            NCDataset,
             VarDimensions,
             VarAttribs
             )
 
     convert_soilorder_to_int(
             FieldsFile,
-            NCFile,
+            NCDataset,
             VarDimensions,
             VarAttribs
             )
 
     direct_conversions(
             FieldsFile,
-            NCFile,
+            NCDataset,
             VarDimensions,
             VarAttribs
             )
 
     scaling_conversions(
             FieldsFile,
-            NCFile,
+            NCDataset,
             VarDimensions,
             VarAttribs,
             scalings
             )
-             
 
-            
+    NCDataset.to_netcdf("ACCESS-ESM1p5-gridinfo-1p875x1p25-CABLE.nc")
