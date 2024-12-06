@@ -1,6 +1,7 @@
 import mule
 import xarray
 import numpy
+import argparse
 
 #----------------------------------------------------------------------------#    
 
@@ -412,14 +413,52 @@ def scaling_conversions(FieldsFile, NCDataset, dims, attribs, scalings):
 #----------------------------------------------------------------------------#    
 
 if __name__ == "__main__":
+
+    # Set up the argparser with default values
+    parser = argparse.ArgumentParser(
+            prog='convert_from_fields',
+            description='Create a CABLE gridinfo file from ACCESS-ESM1.5 ' +\
+            'restart file.',
+            )
+
+    parser.add_argument(
+            '-i',
+            '--input',
+            help='ACCESS-ESM1.5 restart file to use as input',
+            default='/g/data/vk83/configurations/inputs/access-esm1p5/modern/pre-industrial/restart/atmosphere/PI-02.astart-01010101'
+            )
+
+    parser.add_argument(
+            '-s',
+            '--stash',
+            help='STASHmaster file to attach to the fields file',
+            default='/g/data/rp23/experiments/2024-03-12_CABLE4-dev/lw5085/CABLE-as-ACCESS/STASHmaster_A'
+            )
+
+    parser.add_argument(
+            '-a',
+            '--areafile',
+            help='NetCDF file containing areacella variable to use',
+            default='/g/data/fs38/publications/CMIP6/CMIP/CSIRO/ACCESS-ESM1-5/historical/r1i1p1f1/fx/areacella/gn/v20191115/areacella_fx_ACCESS-ESM1-5_historical_r1i1p1f1_gn.nc'
+            )
+
+    parser.add_argument(
+            '-o',
+            '--output',
+            help='File to write the CABLE gridinfo to',
+            default='ACCESS-ESM1p5-1p875x1p25-gridinfo-CABLE.nc'
+            )
+
+    args = parser.parse_args()
+
     # Start by opening the desired UM fields file and attaching the stash
-    FieldsFile = mule.FieldsFile.from_file("PI-02.astart-01010101")
+    FieldsFile = mule.FieldsFile.from_file(args.input)
     # Only take section 0, other sections are diagnostics
-    UMStash = mule.STASHmaster.from_file("STASHmaster_A").by_section(0)
+    UMStash = mule.STASHmaster.from_file(args.stash).by_section(0)
     FieldsFile.attach_stashmaster_info(UMStash)
 
     AreaFile = xarray.open_dataset(
-            "areacella_fx_ACCESS-ESM1-5_piControl_r1i1p1f1_gn.nc",
+            args.areafile,
             engine="netcdf4"
             )
 
@@ -723,4 +762,4 @@ if __name__ == "__main__":
             scalings
             )
 
-    NCDataset.to_netcdf("ACCESS-ESM1p5-gridinfo-1p875x1p25-CABLE.nc")
+    NCDataset.to_netcdf(args.output)
