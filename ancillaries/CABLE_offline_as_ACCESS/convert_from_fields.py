@@ -487,7 +487,7 @@ if __name__ == "__main__":
 
     NCCoords = {
             "longitude": (["longitude"], Longitudes),
-            "latitudes": (["latitude"], Latitudes),
+            "latitude": (["latitude"], Latitudes),
             "patch": (["patch"], patch),
             "soil": (["soil"], soil),
             "rad": (["rad"], rad),
