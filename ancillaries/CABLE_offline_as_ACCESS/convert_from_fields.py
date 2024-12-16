@@ -11,10 +11,17 @@ def define_ncvar(Data, NCDataset, VarName, dims, attribs):
 
     # Set the fill value, depending on the type of the data
     FillVal = -1.0 if Data.dtype.kind == 'f' else -1
+    DType = 'float32' if Data.dtype.kind == 'f' else 'int32'
     numpy.ma.set_fill_value(Data, FillVal)
 
     # Create the variable
     NCDataset[VarName] = (dims, Data)
+
+    # Set the encoding
+    NCDataset[VarName].encoding = {
+            'dtype': DType,
+            '_FillValue': FillVal
+            }
 
     # Assign the attributes
     NCDataset[VarName].assign_attrs(attribs)
@@ -212,8 +219,11 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCDataset, dims, attribs):
 
     # Now do snow depth- ACCESS-ESM1.5 has 3 snow layers, but CABLE only has 1.
     # Retrieve the snow depth stash items
+    # WARNING: The STASH file has the snow fields incorrectly labelled, as of
+    # 17/12/2024. The fields with Stash code 819,820,821 are labelled as
+    # SNOW TEMPERATURE LAYER 1,2,3 but they are actually SNOW DEPTH LAYER 1,2,3
     # Should get layer 1, 2, 3
-    SnowDepthStash = FieldsFile.stashmaster.by_regex("SNOW DEPTH LAYER")
+    SnowDepthStash = FieldsFile.stashmaster.by_regex("SNOW TEMPERATURE LAYER")
 
     # Initialise the array- don't initialise to -1.0, as we want to summate
     # over layers
