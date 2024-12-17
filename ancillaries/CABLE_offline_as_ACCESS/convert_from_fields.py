@@ -10,8 +10,8 @@ def define_ncvar(Data, NCDataset, VarName, dims, attribs):
     dims and attributes."""
 
     # Set the fill value, depending on the type of the data
-    FillVal = -1.0 if Data.dtype.kind == 'f' else -1
-    DType = 'float32' if Data.dtype.kind == 'f' else 'int32'
+    FillVal = -1.0 if Data.dtype.kind == "f" else -1
+    DType = "float32" if Data.dtype.kind == "f" else "int32"
     numpy.ma.set_fill_value(Data, FillVal)
 
     # Create the variable
@@ -19,8 +19,8 @@ def define_ncvar(Data, NCDataset, VarName, dims, attribs):
 
     # Set the encoding
     NCDataset[VarName].encoding = {
-            'dtype': DType,
-            '_FillValue': FillVal
+            "dtype": DType,
+            "_FillValue": FillVal
             }
 
     # Assign the attributes
@@ -44,7 +44,7 @@ def get_area(AreaFile, NCDataset, dims, attribs):
     
 #----------------------------------------------------------------------------#    
 
-def write_albedo(FieldsFile, NCDataset, dims, attribs):
+def write_albedo(FieldsFile, NCDataset, dims, attribs, Mask):
     """Take the Albedo from the UM file as is."""
     
     # Retrieve the Albedo stash item
@@ -59,7 +59,7 @@ def write_albedo(FieldsFile, NCDataset, dims, attribs):
             Albedo = Field.get_data()
 
     # Mask where the values are less than 0
-    Albedo2 = numpy.ma.masked_less(Albedo, 0.0)
+    Albedo2 = numpy.ma.masked_array(Albedo, mask=Mask)
 
     # Send it to the ncvar creator
     define_ncvar(Albedo2,
@@ -68,13 +68,14 @@ def write_albedo(FieldsFile, NCDataset, dims, attribs):
                  dims["albedo2"],
                  attribs["albedo2"])
 
-    # We also need the albedo variable, although it's not used
+    # We also need the albedo variable, although it"s not used
     # Use the template of Albedo2 for the mask
     Albedo = numpy.repeat(
             (numpy.ma.ones_like(Albedo2) * 0.2)[numpy.newaxis, :, :],
             3,
             axis=0
             )
+
     define_ncvar(Albedo,
                  NCDataset,
                  "Albedo",
@@ -94,7 +95,7 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCDataset, dims, attribs):
     # Get the stash code from what should be a single item list
     StashCode = list(PFTStash.values())[0].item
 
-    # We're going to need to manually iterate through indices
+    # We"re going to need to manually iterate through indices
     nLat = NCDataset.sizes["latitude"]
     nLon = NCDataset.sizes["longitude"]
 
@@ -106,7 +107,7 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCDataset, dims, attribs):
         if Field.lbuser4 == StashCode:
             PFTArrays[Field.lbuser5-1, :, :] = Field.get_data()
 
-    # Build the mask that we will use- in most instances we'll also want to
+    # Build the mask that we will use- in most instances we"ll also want to
     # broadcast it over another dimension.
     Mask = numpy.sum(PFTArrays, axis=0) <= 0.0
 
@@ -124,6 +125,20 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCDataset, dims, attribs):
             "iveg",
             dims["iveg"],
             attribs["iveg"]
+            )
+
+    # Set all active cells with a land fraction of 1.0
+    PatchFrac = numpy.ma.masked_array(
+            numpy.ones((nLat, nLon), dtype=numpy.float32),
+            mask=Mask
+            )[numpy.newaxis, :, :]
+
+    define_ncvar(
+            PatchFrac,
+            NCDataset,
+            "patchfrac",
+            dims["patchfrac"],
+            attribs["patchfrac"]
             )
 
     # Now use this information to get the attributes which are dependent on
@@ -225,7 +240,7 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCDataset, dims, attribs):
     # Should get layer 1, 2, 3
     SnowDepthStash = FieldsFile.stashmaster.by_regex("SNOW TEMPERATURE LAYER")
 
-    # Initialise the array- don't initialise to -1.0, as we want to summate
+    # Initialise the array- don"t initialise to -1.0, as we want to summate
     # over layers
     SnowDepth = numpy.zeros(
             tuple(NCDataset.sizes[dim] for dim in dims["SnowDepth"]),
@@ -246,7 +261,7 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCDataset, dims, attribs):
         for (i, j), PFT in numpy.ma.ndenumerate(PFTs):
             SnowDepth[:, i, j] += SnowLayerArrays[PFT-1][i, j]
 
-    # Apply the mask- since we didn't initialise the array to -1.0, we can't
+    # Apply the mask- since we didn"t initialise the array to -1.0, we can"t
     # just use numpy.ma.masked_less. Inherit the mask from the PFT array, and
     # broadcast it to the desired shape by repeating over the time axis.
     SnowDepth = numpy.ma.masked_array(
@@ -316,9 +331,12 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCDataset, dims, attribs):
 
     define_ncvar(css, NCDataset, "css", dims["css"], attribs["css"])
 
+    # Give back the mask to pass to other builders
+    return Mask
+
 #----------------------------------------------------------------------------#    
 
-def convert_soilorder_to_int(FieldsFile, NCDataset, dims, attribs):
+def convert_soilorder_to_int(FieldsFile, NCDataset, dims, attribs, Mask):
     """Convert the soil order from floating point to integer."""
 
     # Get the stash entry associated
@@ -334,7 +352,7 @@ def convert_soilorder_to_int(FieldsFile, NCDataset, dims, attribs):
     SoilOrder = Field.get_data().astype(numpy.int32)
 
     # Mask the array
-    SoilOrder = numpy.ma.masked_less(SoilOrder, 1)
+    SoilOrder = numpy.ma.masked_array(SoilOrder, mask=Mask)
 
     # Pass it to the variable creator
     define_ncvar(
@@ -347,7 +365,7 @@ def convert_soilorder_to_int(FieldsFile, NCDataset, dims, attribs):
 
 #----------------------------------------------------------------------------#    
 
-def direct_conversions(FieldsFile, NCDataset, dims, attribs):
+def direct_conversions(FieldsFile, NCDataset, dims, attribs, Mask):
     """Convert all variables that are a 1:1 conversion, with no level
     dimension, from a UM field to a CABLE field."""
 
@@ -380,7 +398,7 @@ def direct_conversions(FieldsFile, NCDataset, dims, attribs):
 
         # Mask the values in a reasonable range- UM seems to set missing
         # float values to 1e9?
-        Data = numpy.ma.masked_outside(Field.get_data(), 0.0, 1e6)
+        Data = numpy.ma.masked_array(Field.get_data(), mask=Mask)
 
         define_ncvar(
                 Data,
@@ -392,7 +410,7 @@ def direct_conversions(FieldsFile, NCDataset, dims, attribs):
 
 #----------------------------------------------------------------------------#    
 
-def scaling_conversions(FieldsFile, NCDataset, dims, attribs, scalings):
+def scaling_conversions(FieldsFile, NCDataset, dims, attribs, scalings, Mask):
     """Perform all conversions that require scalar/unit conversions to go from
     UM fields to CABLE fields."""
 
@@ -412,8 +430,13 @@ def scaling_conversions(FieldsFile, NCDataset, dims, attribs, scalings):
             if Field.lbuser4 == StashCode:
                 break
 
-        define_ncvar(
+        Data = numpy.ma.masked_array(
                 Field.get_data() * scalings[CABLEVar],
+                mask=Mask
+                )
+
+        define_ncvar(
+                Data,
                 NCDataset,
                 CABLEVar,
                 dims[CABLEVar],
@@ -426,37 +449,37 @@ if __name__ == "__main__":
 
     # Set up the argparser with default values
     parser = argparse.ArgumentParser(
-            prog='convert_from_fields',
-            description='Create a CABLE gridinfo file from ACCESS-ESM1.5 ' +\
-            'restart file.',
+            prog="convert_from_fields",
+            description="Create a CABLE gridinfo file from ACCESS-ESM1.5 " +\
+            "restart file.",
             )
 
     parser.add_argument(
-            '-i',
-            '--input',
-            help='ACCESS-ESM1.5 restart file to use as input',
-            default='/g/data/vk83/configurations/inputs/access-esm1p5/modern/pre-industrial/restart/atmosphere/PI-02.astart-01010101'
+            "-i",
+            "--input",
+            help="ACCESS-ESM1.5 restart file to use as input",
+            default="/g/data/vk83/configurations/inputs/access-esm1p5/modern/pre-industrial/restart/atmosphere/PI-02.astart-01010101"
             )
 
     parser.add_argument(
-            '-s',
-            '--stash',
-            help='STASHmaster file to attach to the fields file',
-            default='/g/data/rp23/experiments/2024-03-12_CABLE4-dev/lw5085/CABLE-as-ACCESS/STASHmaster_A'
+            "-s",
+            "--stash",
+            help="STASHmaster file to attach to the fields file",
+            default="/g/data/rp23/experiments/2024-03-12_CABLE4-dev/lw5085/CABLE-as-ACCESS/STASHmaster_A"
             )
 
     parser.add_argument(
-            '-a',
-            '--areafile',
-            help='NetCDF file containing areacella variable to use',
-            default='/g/data/fs38/publications/CMIP6/CMIP/CSIRO/ACCESS-ESM1-5/historical/r1i1p1f1/fx/areacella/gn/v20191115/areacella_fx_ACCESS-ESM1-5_historical_r1i1p1f1_gn.nc'
+            "-a",
+            "--areafile",
+            help="NetCDF file containing areacella variable to use",
+            default="/g/data/fs38/publications/CMIP6/CMIP/CSIRO/ACCESS-ESM1-5/historical/r1i1p1f1/fx/areacella/gn/v20191115/areacella_fx_ACCESS-ESM1-5_historical_r1i1p1f1_gn.nc"
             )
 
     parser.add_argument(
-            '-o',
-            '--output',
-            help='File to write the CABLE gridinfo to',
-            default='ACCESS-ESM1p5-1p875x1p25-gridinfo-CABLE.nc'
+            "-o",
+            "--output",
+            help="File to write the CABLE gridinfo to",
+            default="ACCESS-ESM1p5-1p875x1p25-gridinfo-CABLE.nc"
             )
 
     args = parser.parse_args()
@@ -487,7 +510,7 @@ if __name__ == "__main__":
     Longitudes = numpy.where(Longitudes > 180.0, -360 + Longitudes, Longitudes)
     Latitudes = numpy.linspace(-90.0, 90.0, 145)
 
-    # For some reason xarray doesn't accept coordinates without values in the
+    # For some reason xarray doesn"t accept coordinates without values in the
     # constuctor (what an awesome package), need to fill the other dimensions
     # with something
     rad = list(range(3))
@@ -514,7 +537,7 @@ if __name__ == "__main__":
             "contact": "lachlan.whyborn@anu.edu.au"
             }
 
-    # Apparently you can't give dimensions to a Dataset?
+    # Apparently you can"t give dimensions to a Dataset?
     NCDataset = xarray.Dataset(
             coords = NCCoords,
             attrs = NCAttribs
@@ -721,14 +744,14 @@ if __name__ == "__main__":
             }
 
     scalings = {
-            "Ndep"  : 1.0 / 365.0,
+            "Ndep"  : 365.0,
             "hyds"  : 1.0 / 1000.0
             }
 
     # Call the variable builders
 
     # Need to get area from elsewhere- there is a GRIDBOX AREA field
-    # in the UM file, but for some reason it's an array of 0.0?
+    # in the UM file, but for some reason it"s an array of 0.0?
     get_area(
             AreaFile,
             NCDataset,
@@ -736,7 +759,8 @@ if __name__ == "__main__":
             VarAttribs
             )
 
-    compute_iveg_and_dependent_vars(
+    # Return the mask to use in the subsequent variables
+    Mask = compute_iveg_and_dependent_vars(
             FieldsFile,
             NCDataset,
             VarDimensions,
@@ -747,21 +771,24 @@ if __name__ == "__main__":
             FieldsFile,
             NCDataset,
             VarDimensions,
-            VarAttribs
+            VarAttribs,
+            Mask
             )
 
     convert_soilorder_to_int(
             FieldsFile,
             NCDataset,
             VarDimensions,
-            VarAttribs
+            VarAttribs,
+            Mask
             )
 
     direct_conversions(
             FieldsFile,
             NCDataset,
             VarDimensions,
-            VarAttribs
+            VarAttribs,
+            Mask
             )
 
     scaling_conversions(
@@ -769,7 +796,8 @@ if __name__ == "__main__":
             NCDataset,
             VarDimensions,
             VarAttribs,
-            scalings
+            scalings,
+            Mask
             )
 
     NCDataset.to_netcdf(args.output)
