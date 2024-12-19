@@ -1,0 +1,26 @@
+## Purpose
+
+Convert the meteorology data from a given ACCESS-ESM1.5 experiment/variation to a format readable by CABLE. The format chosen at this time is picked to match the GSWP format, which is a single file for each year of data for each variable.
+
+## Usage
+
+Call from the command line via
+
+```convert_ACCESS-ESM1p5_meteorology_to_CABLE.py -e <experiment> -v <variation> -y <yearstart,yearend> -o <output>```,
+
+where:
+
+* ```-e <experiment>``` is the experiment name e.g. historical, piControl. Defaults to ```historical```.
+* ```-v <variation>``` is the variation code for the run. Defaults to ```r1i1p1f1```.
+* ```-y <startyear,endyear>``` is the range of years to include in the conversion. Defaults to ```None```, which converts all years in the run.
+* ```-o <output>``` is a template to write to. The template is appended by ```_<variable>_<year>.nc``` e.g. year 1980 in the precipitation would be ```<output>_rainf_1980.nc```. Defaults to ```ACCESS-ESM1p5-to-CABLE```.
+
+The script facilitates writing the variables in parallel, with the number of processes being the number of available CPUs. The only package requirement is xarray, which is available through the ```hh5``` ```conda_concept``` environment on Gadi.
+
+## Method
+
+All the variables bar the surface wind speed have a 1 to 1 mapping between the ACCESS-ESM output and the required CABLE forcing. [xarray](https://docs.xarray.dev/en/stable/) is used for the conversion process, and Python's intrinsic [multiprocessing](https://docs.xarray.dev/en/stable/) package is used for the parallelism.
+
+The time units are converted from days, which is the ACCESS-ESM1.5 default, to seconds, which the GSWP format in CABLE requires.
+
+The computation of the surface wind speed is yet to be confirmed, see discussion on the associated pull request.
