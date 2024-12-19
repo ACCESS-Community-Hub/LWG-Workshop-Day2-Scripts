@@ -1,5 +1,7 @@
 import argparse
 import datetime
+import itertools
+import multiprocessing
 import numpy
 
 import xarray
@@ -17,6 +19,7 @@ def convert_variable(
     and add the supplied attrs to the variable. A YearRange can be supplied as
     a tuple of (YearStart, YearEnd)."""
 
+    print(f"Getting data from {InDataset}")
     # Open as an mfdataset
     InDataset = xarray.open_mfdataset(
             InDataset,
@@ -60,6 +63,11 @@ def convert_variable(
         # Apply the scaling- even if our scaling is 1, it should concretize
         # the data for writing
         InDatasetSlice[OutVariable] *= Scaling
+
+        # Add commentary on this processing
+        InDatasetSlice.attrs["history"] += f'{datetime.datetime.now}; ' +\
+                'separated into single years and modified variable names ' +\
+                'for CABLE compatibility.'
 
         # Generate the filename to write to
         OutFileName = f'{OutTemplate}_{OutVariable}_{str(Year)}.nc'
@@ -182,7 +190,7 @@ def process_CLargs():
             '--output',
             help='Prefix to apply to the output files ' +\
                     'i.e. <output>_<variable>_<year>.nc.',
-            default='ACCESS-ESM1.5-to-CABLE'
+            default='ACCESS-ESM1p5-to-CABLE'
             )
 
     return parser.parse_args()
@@ -210,8 +218,26 @@ if __name__ == '__main__':
     # A convenience lambda for file building
     InFileName = lambda x: f'/g/data/fs38/publications/CMIP6/CMIP/CSIRO/ACCESS-ESM1-5/{args.experiment}/{args.perturbation}/3hr/{x}/gn/latest/{x}_3hr_ACCESS-ESM1-5_{args.experiment}_{args.perturbation}_gn_*.nc'
 
+    # Get number of CPUs available
+    NCPU = multiprocessing.cpu_count()
 
-    # # Call the converter for each variable
+    # Call the converter for each variable in parallel
+    with multiprocessing.Pool(NCPU) as Proc:
+        CABLEVar = VariablesToConvert.keys()
+        ACCESSVar = VariablesToConvert.values()
+        InDatasets = [InFileName(ACCVar) for ACCVar in ACCESSVar]
+
+        # Need to convert the set of inputs to a single iterable
+        ConvertInputs = tuple((InData,
+                               ACCVar,
+                               args.output,
+                               CABVar,
+                               1,
+                               YearRange)
+            for InData, ACCVar, CABVar in zip(InDatasets, ACCESSVar, CABLEVar))
+
+        Proc.starmap(convert_variable, ConvertInputs)
+
     # for CABLEVar, ACCESSVar in VariablesToConvert.items():
         # # Construct the input dataset location
         # InDataset = InFileName(ACCESSVar)
@@ -224,13 +250,13 @@ if __name__ == '__main__':
                 # YearRange=YearRange
                 # )
 
-    # Handle the wind
-    UWindDataset = InFileName('uas')
-    VWindDataset = InFileName('vas')
+    # # Handle the wind
+    # UWindDataset = InFileName('uas')
+    # VWindDataset = InFileName('vas')
 
-    convert_wind_components_to_magnitude(
-            UWindDataset,
-            VWindDataset,
-            args.output,
-            YearRange=YearRange
-            )
+    # convert_wind_components_to_magnitude(
+            # UWindDataset,
+            # VWindDataset,
+            # args.output,
+            # YearRange=YearRange
+            # )
