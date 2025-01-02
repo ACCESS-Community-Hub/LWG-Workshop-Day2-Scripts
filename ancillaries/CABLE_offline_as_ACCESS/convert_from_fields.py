@@ -5,6 +5,62 @@ import argparse
 
 #----------------------------------------------------------------------------#    
 
+def read_CLI_args():
+    """Read the command line arguments."""
+
+    # Set up the argparser with default values
+    parser = argparse.ArgumentParser(
+            prog="convert_from_fields",
+            description="Create a CABLE gridinfo file from ACCESS-ESM1.5 " +\
+            "restart file.",
+            )
+
+    parser.add_argument(
+            "-i",
+            "--input",
+            help="ACCESS-ESM1.5 restart file to use as input",
+            default="/g/data/vk83/configurations/inputs/access-esm1p5/modern/pre-industrial/restart/atmosphere/PI-02.astart-01010101"
+            )
+
+    parser.add_argument(
+            "-s",
+            "--stash",
+            help="STASHmaster file to attach to the fields file",
+            default="/g/data/rp23/experiments/2024-03-12_CABLE4-dev/lw5085/CABLE-as-ACCESS/STASHmaster_A"
+            )
+
+    parser.add_argument(
+            "-a",
+            "--areafile",
+            help="NetCDF file containing areacella variable to use",
+            default="/g/data/fs38/publications/CMIP6/CMIP/CSIRO/ACCESS-ESM1-5/historical/r1i1p1f1/fx/areacella/gn/v20191115/areacella_fx_ACCESS-ESM1-5_historical_r1i1p1f1_gn.nc"
+            )
+
+    parser.add_argument(
+            "-o",
+            "--output",
+            help="File to write the CABLE gridinfo to",
+            default="ACCESS-ESM1p5-1p875x1p25-gridinfo-CABLE.nc"
+            )
+
+    parser.add_argument(
+            "--create_landmask",
+            action='store_true',
+            help="Create a landmask from the given ESM restart file"
+            )
+
+    parser.add_argument(
+            "--landmask_file",
+            help="File to save the land mask to",
+            default="ACCESS-ESM1p5-1p875x1p25-landmask.nc"
+            )
+
+    args = parser.parse_args()
+
+    return args
+
+#----------------------------------------------------------------------------#    
+
 def define_ncvar(Data, NCDataset, VarName, dims, attribs):
     """Add a variable to the given netCDF file, with the given data, name,
     dims and attributes."""
@@ -44,48 +100,28 @@ def get_area(AreaFile, NCDataset, dims, attribs):
     
 #----------------------------------------------------------------------------#    
 
-def write_albedo(FieldsFile, NCDataset, dims, attribs, Mask):
-    """Take the Albedo from the UM file as is."""
-    
-    # Retrieve the Albedo stash item
-    AlbedoStash = FieldsFile.stashmaster.by_regex("SNOW-FREE ALBEDO OF SOIL")
+def retrieve_landmask(FieldsFile):
+    """Retrieve the landmask from the fields file, to use with other
+    variables."""
 
-    # Should be a single item dictionary- retrieve the value
-    StashCode = list(AlbedoStash.values())[0].item
+    # Get the land mask from the stash
+    MaskStash = FieldsFile.stashmaster.by_regex("LAND MASK")
 
-    # Retrieve the array
+    # Should be a single item
+    StashCode = list(MaskStash.values())[0].item
+
     for Field in FieldsFile.fields:
         if Field.lbuser4 == StashCode:
-            Albedo = Field.get_data()
+            Landmask = Field.get_data()
 
-    # Mask where the values are less than 0
-    Albedo2 = numpy.ma.masked_array(Albedo, mask=Mask)
+    # Convert it to boolean (it seems to be a float initially?)
+    Landmask = Landmask.astype(bool)
 
-    # Send it to the ncvar creator
-    define_ncvar(Albedo2,
-                 NCDataset,
-                 "albedo2",
-                 dims["albedo2"],
-                 attribs["albedo2"])
-
-    # We also need the albedo variable, although it"s not used
-    # Use the template of Albedo2 for the mask
-    Albedo = numpy.repeat(
-            (numpy.ma.ones_like(Albedo2) * 0.2)[numpy.newaxis, :, :],
-            3,
-            axis=0
-            )
-
-    define_ncvar(Albedo,
-                 NCDataset,
-                 "Albedo",
-                 dims["Albedo"],
-                 attribs["Albedo"]
-                 )
+    return Landmask
 
 #----------------------------------------------------------------------------#    
 
-def compute_iveg_and_dependent_vars(FieldsFile, NCDataset, dims, attribs):
+def compute_iveg_and_dep_vars(FieldsFile, NCDataset, dims, attribs, Mask):
     """Determine the dominant vegetation type and use it to get the LAI,
     soil moisture, soil temperature, snow depth and soil type."""
 
@@ -106,10 +142,6 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCDataset, dims, attribs):
     for Field in FieldsFile.fields:
         if Field.lbuser4 == StashCode:
             PFTArrays[Field.lbuser5-1, :, :] = Field.get_data()
-
-    # Build the mask that we will use- in most instances we"ll also want to
-    # broadcast it over another dimension.
-    Mask = numpy.sum(PFTArrays, axis=0) <= 0.0
 
     # Now we want the max index across each page of the array (+1 due to 0
     # based indexing).
@@ -336,6 +368,47 @@ def compute_iveg_and_dependent_vars(FieldsFile, NCDataset, dims, attribs):
 
 #----------------------------------------------------------------------------#    
 
+def write_albedo(FieldsFile, NCDataset, dims, attribs, Mask):
+    """Take the Albedo from the UM file as is."""
+    
+    # Retrieve the Albedo stash item
+    AlbedoStash = FieldsFile.stashmaster.by_regex("SNOW-FREE ALBEDO OF SOIL")
+
+    # Should be a single item dictionary- retrieve the value
+    StashCode = list(AlbedoStash.values())[0].item
+
+    # Retrieve the array
+    for Field in FieldsFile.fields:
+        if Field.lbuser4 == StashCode:
+            Albedo = Field.get_data()
+
+    # Mask where the values are less than 0
+    Albedo2 = numpy.ma.masked_array(Albedo, mask=Mask)
+
+    # Send it to the ncvar creator
+    define_ncvar(Albedo2,
+                 NCDataset,
+                 "albedo2",
+                 dims["albedo2"],
+                 attribs["albedo2"])
+
+    # We also need the albedo variable, although it"s not used
+    # Use the template of Albedo2 for the mask
+    Albedo = numpy.repeat(
+            (numpy.ma.ones_like(Albedo2) * 0.2)[numpy.newaxis, :, :],
+            3,
+            axis=0
+            )
+
+    define_ncvar(Albedo,
+                 NCDataset,
+                 "Albedo",
+                 dims["Albedo"],
+                 attribs["Albedo"]
+                 )
+
+#----------------------------------------------------------------------------#    
+
 def convert_soilorder_to_int(FieldsFile, NCDataset, dims, attribs, Mask):
     """Convert the soil order from floating point to integer."""
 
@@ -447,42 +520,8 @@ def scaling_conversions(FieldsFile, NCDataset, dims, attribs, scalings, Mask):
 
 if __name__ == "__main__":
 
-    # Set up the argparser with default values
-    parser = argparse.ArgumentParser(
-            prog="convert_from_fields",
-            description="Create a CABLE gridinfo file from ACCESS-ESM1.5 " +\
-            "restart file.",
-            )
-
-    parser.add_argument(
-            "-i",
-            "--input",
-            help="ACCESS-ESM1.5 restart file to use as input",
-            default="/g/data/vk83/configurations/inputs/access-esm1p5/modern/pre-industrial/restart/atmosphere/PI-02.astart-01010101"
-            )
-
-    parser.add_argument(
-            "-s",
-            "--stash",
-            help="STASHmaster file to attach to the fields file",
-            default="/g/data/rp23/experiments/2024-03-12_CABLE4-dev/lw5085/CABLE-as-ACCESS/STASHmaster_A"
-            )
-
-    parser.add_argument(
-            "-a",
-            "--areafile",
-            help="NetCDF file containing areacella variable to use",
-            default="/g/data/fs38/publications/CMIP6/CMIP/CSIRO/ACCESS-ESM1-5/historical/r1i1p1f1/fx/areacella/gn/v20191115/areacella_fx_ACCESS-ESM1-5_historical_r1i1p1f1_gn.nc"
-            )
-
-    parser.add_argument(
-            "-o",
-            "--output",
-            help="File to write the CABLE gridinfo to",
-            default="ACCESS-ESM1p5-1p875x1p25-gridinfo-CABLE.nc"
-            )
-
-    args = parser.parse_args()
+    # Read the command line args
+    args = read_CLI_args()
 
     # Start by opening the desired UM fields file and attaching the stash
     FieldsFile = mule.FieldsFile.from_file(args.input)
@@ -533,7 +572,8 @@ if __name__ == "__main__":
                     "CMIP6 pre-industrial runs.",
             "comments": "Converted from the UM fields file on Gadi at " +\
                     "/g/data/vk83/configurations/inputs/access-esm1p5/modern/pre-industrial/restart/atmosphere/PI-02.astart-01010101 " +\
-                    "with the python script at [SCRIPT LOCATION HERE].",
+                    "with the python script at ." +\
+                    "https://github.com/ACCESS-Community-Hub/Land-ancillary-creation/ancillaries/CABLE_offline_as_ACCESS",
             "contact": "lachlan.whyborn@anu.edu.au"
             }
 
@@ -572,7 +612,8 @@ if __name__ == "__main__":
             "rhosoil"   : ("latitude", "longitude"),
             "cnsd"      : ("latitude", "longitude"),
             "css"       : ("latitude", "longitude"),
-            "albedo2"   : ("latitude", "longitude")
+            "albedo2"   : ("latitude", "longitude"),
+            "mask"      : ("latitude", "longitude")
             }
 
     # And do the same with the attributes
@@ -740,6 +781,10 @@ if __name__ == "__main__":
                 "long_name"     : "Snow-free albedo of soil",
                 "units"         : 1,
                 "missing_value" : -1.0
+                },
+            "mask"      : {
+                "long_name"     : "land_binary_mask",
+                "comments"      : "1=land, 0=sea"
                 }
             }
 
@@ -759,12 +804,45 @@ if __name__ == "__main__":
             VarAttribs
             )
 
-    # Return the mask to use in the subsequent variables
-    Mask = compute_iveg_and_dependent_vars(
+    # Retrieve the mask used to act as a numpy mask
+    Mask = retrieve_landmask(FieldsFile)
+
+    # If required, create the landmask file
+    if args.create_landmask:
+        MaskCoords = {
+                "longitude": (["longitude"], Longitudes),
+                "latitude": (["latitude"], Latitudes)
+                }
+        MaskAttribs = {
+                "source": "ACCESS-ESM1.5 atmosphere restart file from " +\
+                        "CMIP6 pre-industrial runs.",
+                "comments": "From the \"LAND MASK (No halo)\" field in " +\
+                            "/g/data/vk83/configurations/inputs/access-esm1p5/modern/pre-industrial/restart/atmosphere/PI-02.astart-01010101.",
+                "contact": "lachlan.whyborn@anu.edu.au"
+                }
+
+        MaskDataset = xarray.Dataset(
+                data_vars = {
+                    "mask": (
+                        ("latitude", "longitude"),
+                        Mask.astype(numpy.int8),
+                        MaskAttribs
+                        )
+                    },
+                coords = MaskCoords,
+                attrs = MaskAttribs
+                )
+
+        MaskDataset.to_netcdf(args.landmask_file)
+
+    # We have a series of variables which are dependent on the vegetation type
+    # calculation, so do them all at once
+    compute_iveg_and_dep_vars(
             FieldsFile,
             NCDataset,
             VarDimensions,
-            VarAttribs
+            VarAttribs,
+            Mask
             )
 
     write_albedo(
