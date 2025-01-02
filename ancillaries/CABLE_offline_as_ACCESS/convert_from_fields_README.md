@@ -7,20 +7,22 @@ Converts directly from the ACCESS-ESM1.5 atmosphere restart file in UM Fields fo
 Invoked at the command line via
 
 ```
-python3 convert_from_fields.py --input(-i) <ACCESS_restart_file> --stash(-s) <UM_stash_file> --output(-o) <file_to_write.nc> --areafile(-a) <file_with_gridcell_area>
+python3 convert_from_fields.py --input(-i) <ESM_restart_file> --stash(-s) <UM_stash_file> --output(-o) <file_to_write.nc> --areafile(-a) <file_with_gridcell_area> --create_landmask --landmask_file <file_to_write_landmask.nc>
 ```
 
-There are defaults for each argument which point to existing files on Gadi:
---input:    /g/data/vk83/configurations/inputs/access-esm1p5/modern/pre-industrial/restart/atmosphere/PI-02.astart-01010101
---stash:    /g/data/rp23/experiments/2024-03-12\_CABLE4-dev/lw5085/CABLE-as-ACCESS/STASHmaster\_A
---areafile: /g/data/fs38/publications/CMIP6/CMIP/CSIRO/ACCESS-ESM1-5/historical/r1i1p1f1/fx/areacella/gn/v20191115/areacella\_fx\_ACCESS-ESM1-5\_historical\_r1i1p1f1\_gn.nc
---output:   ACCESS-ESM1p5-1p875x1p25-gridinfo-CABLE.nc
+The command line arguments are as follows:
+* --input: ACCESS-ESM restart file to convert. Defaults to "/g/data/vk83/configurations/inputs/access-esm1p5/modern/pre-industrial/restart/atmosphere/PI-02.astart-01010101".
+* --stash: Supplementary stash file to use. Defaults to "/g/data/rp23/experiments/2024-03-12\_CABLE4-dev/lw5085/CABLE-as-ACCESS/STASHmaster\_A".
+* --areafile: File containing grid cell area data. Defaults to "/g/data/fs38/publications/CMIP6/CMIP/CSIRO/ACCESS-ESM1-5/historical/r1i1p1f1/fx/areacella/gn/v20191115/areacella\_fx\_ACCESS-ESM1-5\_historical\_r1i1p1f1\_gn.nc"
+* --output: File name to write to. Defaults to "ACCESS-ESM1p5-1p875x1p25-gridinfo-CABLE.nc".
+* --create_landmask: Whether to write out the landmask to disk. Defaults to ```False```.
+* --landmask_file: File to write the landmask to. Defaults to "ACCESS-ESM1p5-1p875x1p25-landmask.nc".
 
 The script the ```xarray``` and ```mule``` python packages, which are available through the hh5 ```conda_concept``` module.
 
 ## Method
 
-The specifics of the conversion process for each of the variables is described in the table below.
+The specifics of the conversion process for each of the variables is described in the table below. The mask is created by inspecting the "LAND MASK (No halo)" field (Stash code=19) in the ACCESS restart file.
 
 | GridInfo Name | UM Stash Code | Comments |
 |:-------------:|:--------------|----------|
