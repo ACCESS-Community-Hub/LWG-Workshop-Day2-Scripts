@@ -61,7 +61,7 @@ def read_CLI_args():
 
 #----------------------------------------------------------------------------#    
 
-def define_ncvar(Data, NCDataset, VarName, dims, attribs):
+def define_ncvar(Data, NCDataset, VarName, dims, attribs, RollDist):
     """Add a variable to the given netCDF file, with the given data, name,
     dims and attributes."""
 
@@ -69,6 +69,10 @@ def define_ncvar(Data, NCDataset, VarName, dims, attribs):
     FillVal = -1.0 if Data.dtype.kind == "f" else -1
     DType = "float32" if Data.dtype.kind == "f" else "int32"
     numpy.ma.set_fill_value(Data, FillVal)
+
+    # Roll the array so that it matches with monotonic longitudes
+    RollAxis = dims.index("longitude")
+    Data = numpy.roll(Data, RollDist, axis=RollAxis)
 
     # Create the variable
     NCDataset[VarName] = (dims, Data)
@@ -84,7 +88,7 @@ def define_ncvar(Data, NCDataset, VarName, dims, attribs):
 
 #----------------------------------------------------------------------------#    
 
-def get_area(AreaFile, NCDataset, dims, attribs):
+def get_area(AreaFile, NCDataset, dims, attribs, RollDist):
     """Get the area attribute from a different netCDF file."""
 
     # Assuming we have areacella attribute
@@ -95,12 +99,13 @@ def get_area(AreaFile, NCDataset, dims, attribs):
             NCDataset,
             "area",
             dims["area"],
-            attribs["area"]
+            attribs["area"],
+            RollDist
             )
     
 #----------------------------------------------------------------------------#    
 
-def retrieve_landmask(FieldsFile):
+def retrieve_landmask(FieldsFile, RollDist):
     """Retrieve the landmask from the fields file, to use with other
     variables."""
 
@@ -121,7 +126,14 @@ def retrieve_landmask(FieldsFile):
 
 #----------------------------------------------------------------------------#    
 
-def compute_iveg_and_dep_vars(FieldsFile, NCDataset, dims, attribs, Mask):
+def compute_iveg_and_dep_vars(
+        FieldsFile,
+        NCDataset,
+        dims,
+        attribs,
+        Mask,
+        RollDist
+        ):
     """Determine the dominant vegetation type and use it to get the LAI,
     soil moisture, soil temperature, snow depth and soil type."""
 
@@ -156,7 +168,8 @@ def compute_iveg_and_dep_vars(FieldsFile, NCDataset, dims, attribs, Mask):
             NCDataset,
             "iveg",
             dims["iveg"],
-            attribs["iveg"]
+            attribs["iveg"],
+            RollDist
             )
 
     # Set all active cells with a land fraction of 1.0
@@ -170,7 +183,8 @@ def compute_iveg_and_dep_vars(FieldsFile, NCDataset, dims, attribs, Mask):
             NCDataset,
             "patchfrac",
             dims["patchfrac"],
-            attribs["patchfrac"]
+            attribs["patchfrac"],
+            RollDist
             )
 
     # Now use this information to get the attributes which are dependent on
@@ -222,7 +236,8 @@ def compute_iveg_and_dep_vars(FieldsFile, NCDataset, dims, attribs, Mask):
             NCDataset,
             "SoilMoist",
             dims["SoilMoist"],
-            attribs["SoilMoist"]
+            attribs["SoilMoist"],
+            RollDist
             )
 
     # Now do soil temperature, in the same manner as soil moisture
@@ -262,6 +277,7 @@ def compute_iveg_and_dep_vars(FieldsFile, NCDataset, dims, attribs, Mask):
             "SoilTemp",
             dims["SoilTemp"],
             attribs["SoilTemp"],
+            RollDist
             )
 
     # Now do snow depth- ACCESS-ESM1.5 has 3 snow layers, but CABLE only has 1.
@@ -306,7 +322,8 @@ def compute_iveg_and_dep_vars(FieldsFile, NCDataset, dims, attribs, Mask):
             NCDataset,
             "SnowDepth",
             dims["SnowDepth"],
-            attribs["SnowDepth"]
+            attribs["SnowDepth"],
+            RollDist
             )
 
     # LAI
@@ -339,12 +356,26 @@ def compute_iveg_and_dep_vars(FieldsFile, NCDataset, dims, attribs, Mask):
             mask=numpy.repeat(Mask[numpy.newaxis, :, :], 12, axis=0)
             )
 
-    define_ncvar(LAI, NCDataset, "LAI", dims["LAI"], attribs["LAI"])
+    define_ncvar(
+            LAI,
+            NCDataset,
+            "LAI",
+            dims["LAI"],
+            attribs["LAI"],
+            RollDist
+            )
 
     # Now do isoil- 2 everywhere except where PFT=19, where isoil=9
     iSoil = numpy.ma.where(PFTs == 17, 9, 2)
 
-    define_ncvar(iSoil, NCDataset, "isoil", dims["isoil"], attribs["isoil"])
+    define_ncvar(
+            iSoil,
+            NCDataset,
+            "isoil",
+            dims["isoil"],
+            attribs["isoil"],
+            RollDist
+            )
 
     # Variables that depend on isoil
     # rhosoil
@@ -355,20 +386,27 @@ def compute_iveg_and_dep_vars(FieldsFile, NCDataset, dims, attribs, Mask):
             NCDataset,
             "rhosoil",
             dims["rhosoil"],
-            attribs["rhosoil"]
+            attribs["rhosoil"],
+            RollDist
             )
 
     # css
     css = numpy.ma.where(iSoil == 2, 850.0, 2100.0)
 
-    define_ncvar(css, NCDataset, "css", dims["css"], attribs["css"])
+    define_ncvar(
+            css,
+            NCDataset,
+            "css",
+            dims["css"],
+            attribs["css"],
+            RollDist)
 
     # Give back the mask to pass to other builders
     return Mask
 
 #----------------------------------------------------------------------------#    
 
-def write_albedo(FieldsFile, NCDataset, dims, attribs, Mask):
+def write_albedo(FieldsFile, NCDataset, dims, attribs, Mask, RollDist):
     """Take the Albedo from the UM file as is."""
     
     # Retrieve the Albedo stash item
@@ -390,7 +428,8 @@ def write_albedo(FieldsFile, NCDataset, dims, attribs, Mask):
                  NCDataset,
                  "albedo2",
                  dims["albedo2"],
-                 attribs["albedo2"])
+                 attribs["albedo2"],
+                 RollDist)
 
     # We also need the albedo variable, although it"s not used
     # Use the template of Albedo2 for the mask
@@ -404,12 +443,20 @@ def write_albedo(FieldsFile, NCDataset, dims, attribs, Mask):
                  NCDataset,
                  "Albedo",
                  dims["Albedo"],
-                 attribs["Albedo"]
+                 attribs["Albedo"],
+                 RollDist
                  )
 
 #----------------------------------------------------------------------------#    
 
-def convert_soilorder_to_int(FieldsFile, NCDataset, dims, attribs, Mask):
+def convert_soilorder_to_int(
+        FieldsFile,
+        NCDataset,
+        dims,
+        attribs,
+        Mask,
+        RollDist
+        ):
     """Convert the soil order from floating point to integer."""
 
     # Get the stash entry associated
@@ -433,12 +480,13 @@ def convert_soilorder_to_int(FieldsFile, NCDataset, dims, attribs, Mask):
             NCDataset,
             "SoilOrder",
             dims["SoilOrder"],
-            attribs["SoilOrder"]
+            attribs["SoilOrder"],
+            RollDist
             )
 
 #----------------------------------------------------------------------------#    
 
-def direct_conversions(FieldsFile, NCDataset, dims, attribs, Mask):
+def direct_conversions(FieldsFile, NCDataset, dims, attribs, Mask, RollDist):
     """Convert all variables that are a 1:1 conversion, with no level
     dimension, from a UM field to a CABLE field."""
 
@@ -478,12 +526,21 @@ def direct_conversions(FieldsFile, NCDataset, dims, attribs, Mask):
                 NCDataset,
                 CABLEVar,
                 dims[CABLEVar],
-                attribs[CABLEVar]
+                attribs[CABLEVar],
+                RollDist
                 )
 
 #----------------------------------------------------------------------------#    
 
-def scaling_conversions(FieldsFile, NCDataset, dims, attribs, scalings, Mask):
+def scaling_conversions(
+        FieldsFile,
+        NCDataset,
+        dims,
+        attribs,
+        scalings,
+        Mask,
+        RollDist
+        ):
     """Perform all conversions that require scalar/unit conversions to go from
     UM fields to CABLE fields."""
 
@@ -513,7 +570,8 @@ def scaling_conversions(FieldsFile, NCDataset, dims, attribs, scalings, Mask):
                 NCDataset,
                 CABLEVar,
                 dims[CABLEVar],
-                attribs[CABLEVar]
+                attribs[CABLEVar],
+                RollDist
                 )
 
 #----------------------------------------------------------------------------#    
@@ -545,9 +603,21 @@ if __name__ == "__main__":
             }
 
     # Remember to map longitude from 0.0 -> 360.0 to -180.0 -> 180.0
-    Longitudes = numpy.linspace(0.0, 360.0, 192, endpoint=False)
+    Longitudes = numpy.linspace(
+            0.0,
+            360.0,
+            NCDimensions["longitude"],
+            endpoint=False)
+
     Longitudes = numpy.where(Longitudes > 180.0, -360 + Longitudes, Longitudes)
-    Latitudes = numpy.linspace(-90.0, 90.0, 145)
+    
+    # We also want to roll the longitude axis so that it is monotonically
+    # ascending- and also store the amount we want to shift, to use on the
+    # data arrays
+    RollDist = NCDimensions["longitude"] - numpy.argmax(Longitudes < 0.0)
+    print(f"Distance to roll the arrays: {RollDist}")
+    Longitudes = numpy.roll(Longitudes, RollDist)
+    Latitudes = numpy.linspace(-90.0, 90.0, NCDimensions["latitude"])
 
     # For some reason xarray doesn"t accept coordinates without values in the
     # constuctor (what an awesome package), need to fill the other dimensions
@@ -801,11 +871,12 @@ if __name__ == "__main__":
             AreaFile,
             NCDataset,
             VarDimensions,
-            VarAttribs
+            VarAttribs,
+            RollDist
             )
 
     # Retrieve the mask used to act as a numpy mask
-    Mask = retrieve_landmask(FieldsFile)
+    Mask = retrieve_landmask(FieldsFile, RollDist)
 
     # If required, create the landmask file
     if args.create_landmask:
@@ -825,7 +896,7 @@ if __name__ == "__main__":
                 data_vars = {
                     "mask": (
                         ("latitude", "longitude"),
-                        Mask.astype(numpy.int8),
+                        numpy.roll(Mask.astype(numpy.int8), RollDist, axis=0),
                         MaskAttribs
                         )
                     },
@@ -842,7 +913,8 @@ if __name__ == "__main__":
             NCDataset,
             VarDimensions,
             VarAttribs,
-            Mask
+            Mask,
+            RollDist
             )
 
     write_albedo(
@@ -850,7 +922,8 @@ if __name__ == "__main__":
             NCDataset,
             VarDimensions,
             VarAttribs,
-            Mask
+            Mask,
+            RollDist
             )
 
     convert_soilorder_to_int(
@@ -858,7 +931,8 @@ if __name__ == "__main__":
             NCDataset,
             VarDimensions,
             VarAttribs,
-            Mask
+            Mask,
+            RollDist
             )
 
     direct_conversions(
@@ -866,7 +940,8 @@ if __name__ == "__main__":
             NCDataset,
             VarDimensions,
             VarAttribs,
-            Mask
+            Mask,
+            RollDist
             )
 
     scaling_conversions(
@@ -875,7 +950,8 @@ if __name__ == "__main__":
             VarDimensions,
             VarAttribs,
             scalings,
-            Mask
+            Mask,
+            RollDist
             )
 
     NCDataset.to_netcdf(args.output)

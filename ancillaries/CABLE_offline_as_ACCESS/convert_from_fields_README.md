@@ -18,7 +18,7 @@ The command line arguments are as follows:
 * --create_landmask: Whether to write out the landmask to disk. Defaults to ```False```.
 * --landmask_file: File to write the landmask to. Defaults to "ACCESS-ESM1p5-1p875x1p25-landmask.nc".
 
-The script the ```xarray``` and ```mule``` python packages, which are available through the hh5 ```conda_concept``` module.
+The script the ```xarray``` and ```mule``` python packages, which are available through the hh5 ```conda_concept``` module. Note that ACCESS-ESM operates on a [0, 360) longitude domain, and CABLE typically operates on a (-180, 180] domain. Due to this, the existing fields are "rolled" over such that the longitudes are monotonically ascending.
 
 ## Method
 
