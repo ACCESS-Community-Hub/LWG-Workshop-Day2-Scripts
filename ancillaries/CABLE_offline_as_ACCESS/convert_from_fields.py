@@ -118,6 +118,10 @@ def retrieve_landmask(FieldsFile, RollDist):
     for Field in FieldsFile.fields:
         if Field.lbuser4 == StashCode:
             Landmask = Field.get_data()
+            # We need to break here, because there are duplicate stash codes
+            # even though that's not supposed to be possible with fields with
+            # a single level
+            break
 
     # Convert it to boolean (it seems to be a float initially?)
     Landmask = Landmask.astype(bool)
@@ -219,7 +223,6 @@ def compute_iveg_and_dep_vars(
             if Field.lbuser4 == StashCode:
                 SoilMoistureArrays.append(Field.get_data())
 
-
         # Now iterate through the valid indices of the PFT array
         for (i, j), PFT in numpy.ma.ndenumerate(PFTs):
             SoilMoisture[:, Layer, i, j] = SoilMoistureArrays[PFT-1][i, j]
@@ -261,7 +264,6 @@ def compute_iveg_and_dep_vars(
         for Field in FieldsFile.fields:
             if Field.lbuser4 == StashCode:
                 SoilTempArrays.append(Field.get_data())
-
 
         # Now iterate through the valid indices of the PFT array
         for (i, j), PFT in numpy.ma.ndenumerate(PFTs):
