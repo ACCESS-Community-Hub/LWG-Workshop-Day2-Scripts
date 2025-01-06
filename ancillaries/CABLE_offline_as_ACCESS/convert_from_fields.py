@@ -117,10 +117,11 @@ def retrieve_landmask(FieldsFile, RollDist):
 
     for Field in FieldsFile.fields:
         if Field.lbuser4 == StashCode:
+            # Somehow there are two fields with the same stash code? I thought
+            # this was supposed to be impossible
             Landmask = Field.get_data()
-            # We need to break here, because there are duplicate stash codes
-            # even though that's not supposed to be possible with fields with
-            # a single level
+            # For some reason, this single level field has duplicate stash
+            # codes, but the second entry is full of 0s. Only take the first
             break
 
     # Convert it to boolean (it seems to be a float initially?)
@@ -223,6 +224,7 @@ def compute_iveg_and_dep_vars(
             if Field.lbuser4 == StashCode:
                 SoilMoistureArrays.append(Field.get_data())
 
+
         # Now iterate through the valid indices of the PFT array
         for (i, j), PFT in numpy.ma.ndenumerate(PFTs):
             SoilMoisture[:, Layer, i, j] = SoilMoistureArrays[PFT-1][i, j]
@@ -264,6 +266,7 @@ def compute_iveg_and_dep_vars(
         for Field in FieldsFile.fields:
             if Field.lbuser4 == StashCode:
                 SoilTempArrays.append(Field.get_data())
+
 
         # Now iterate through the valid indices of the PFT array
         for (i, j), PFT in numpy.ma.ndenumerate(PFTs):
@@ -617,7 +620,6 @@ if __name__ == "__main__":
     # ascending- and also store the amount we want to shift, to use on the
     # data arrays
     RollDist = NCDimensions["longitude"] - numpy.argmax(Longitudes < 0.0)
-    print(f"Distance to roll the arrays: {RollDist}")
     Longitudes = numpy.roll(Longitudes, RollDist)
     Latitudes = numpy.linspace(-90.0, 90.0, NCDimensions["latitude"])
 
@@ -898,7 +900,7 @@ if __name__ == "__main__":
                 data_vars = {
                     "mask": (
                         ("latitude", "longitude"),
-                        numpy.roll(Mask.astype(numpy.int8), RollDist, axis=0),
+                        numpy.roll(Mask.astype(numpy.int8), RollDist, axis=1),
                         MaskAttribs
                         )
                     },
