@@ -6,6 +6,52 @@ import numpy
 
 import xarray
 
+#-----------------------------------------------------------------------------#
+
+def read_CLI_args():
+    """Process the command line arguments and return the args."""
+
+    parser = argparse.ArgumentParser(
+            prog='convert_ESM_to_CABLE',
+            description='Converts the meteorology from a given experiment ' +\
+                    'to a format readable by CABLE. Splits file into ' +\
+                    'individual years.'
+                    )
+
+    parser.add_argument(
+            '-e',
+            '--experiment',
+            help='CMIP6 experiment to read from.',
+            default='historical'
+            )
+
+    parser.add_argument(
+            '-p',
+            '--perturbation',
+            help='Perturbation within the experiment to read from',
+            default='r1i1p1f1'
+            )
+
+    parser.add_argument(
+            '-y',
+            '--years',
+            help='<StartYear,EndYear> to set the range of year to convert. ' +\
+                    'Defaults to all available years.',
+            default=None
+            )
+
+    parser.add_argument(
+            '-o',
+            '--output',
+            help='Prefix to apply to the output files ' +\
+                    'i.e. <output>_<variable>_<year>.nc.',
+            default='ACCESS-ESM1p5-to-CABLE'
+            )
+
+    return parser.parse_args()
+
+#-----------------------------------------------------------------------------#
+
 def convert_variable(
         InDataset,
         InVariable,
@@ -73,6 +119,8 @@ def convert_variable(
         OutFileName = f'{OutTemplate}_{OutVariable}_{str(Year)}.nc'
 
         InDatasetSlice.to_netcdf(OutFileName)
+
+#-----------------------------------------------------------------------------#
 
 def convert_wind_components_to_magnitude(
         UWindDataset,
@@ -153,50 +201,10 @@ def convert_wind_components_to_magnitude(
 
         MagWindSlice.to_netcdf(OutFileName)
        
-def process_CLargs():
-    """Process the command line arguments and return the args."""
-
-    parser = argparse.ArgumentParser(
-            prog='convert_ESM_to_CABLE',
-            description='Converts the meteorology from a given experiment ' +\
-                    'to a format readable by CABLE. Splits file into ' +\
-                    'individual years.'
-                    )
-
-    parser.add_argument(
-            '-e',
-            '--experiment',
-            help='CMIP6 experiment to read from.',
-            default='historical'
-            )
-
-    parser.add_argument(
-            '-p',
-            '--perturbation',
-            help='Perturbation within the experiment to read from',
-            default='r1i1p1f1'
-            )
-
-    parser.add_argument(
-            '-y',
-            '--years',
-            help='<StartYear,EndYear> to set the range of year to convert. ' +\
-                    'Defaults to all available years.',
-            default=None
-            )
-
-    parser.add_argument(
-            '-o',
-            '--output',
-            help='Prefix to apply to the output files ' +\
-                    'i.e. <output>_<variable>_<year>.nc.',
-            default='ACCESS-ESM1p5-to-CABLE'
-            )
-
-    return parser.parse_args()
+#-----------------------------------------------------------------------------#
 
 if __name__ == '__main__':
-    args = process_CLargs()
+    args = read_CLI_args()
 
     # Define the mapping from ACCESS-ESM names to CABLE
     VariablesToConvert = {

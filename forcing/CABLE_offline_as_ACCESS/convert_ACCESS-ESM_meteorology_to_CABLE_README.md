@@ -10,10 +10,10 @@ Call from the command line via
 
 where:
 
-* ```-e <experiment>``` is the experiment name e.g. historical, piControl. Defaults to ```historical```.
-* ```-v <variation>``` is the variation code for the run. Defaults to ```r1i1p1f1```.
-* ```-y <startyear,endyear>``` is the range of years to include in the conversion. Defaults to ```None```, which converts all years in the run.
-* ```-o <output>``` is a template to write to. The template is appended by ```_<variable>_<year>.nc``` e.g. year 1980 in the precipitation would be ```<output>_rainf_1980.nc```. Defaults to ```ACCESS-ESM1p5-to-CABLE```.
+* ```--experiment(-e) <experiment>``` is the experiment name e.g. historical, piControl. Defaults to ```historical```.
+* ```--variation(-v) <variation>``` is the variation code for the run. Defaults to ```r1i1p1f1```.
+* ```--years(-y) <startyear,endyear>``` is the range of years to include in the conversion. Defaults to ```None```, which converts all years in the run.
+* ```--output(-o) <output>``` is a template to write to. The template is appended by ```_<variable>_<year>.nc``` e.g. year 1980 in the precipitation would be ```<output>_rainf_1980.nc```. Defaults to ```ACCESS-ESM1p5-to-CABLE```.
 
 The script facilitates writing the variables in parallel, with the number of processes being the number of available CPUs. The only package requirement is xarray, which is available through the ```hh5``` ```conda_concept``` environment on Gadi.
 
