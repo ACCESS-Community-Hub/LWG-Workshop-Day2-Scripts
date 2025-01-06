@@ -52,6 +52,14 @@ def read_CLI_args():
 
 #-----------------------------------------------------------------------------#
 
+def map_to_pm180(Data):
+    """Map the given dataset to a longitude domain of (-180.0, 180.0]."""
+    RollDist = (Data['longitude'] > 180.0).argmax().item()
+
+    return Data.roll(RollDist, dims='longitude')
+
+#-----------------------------------------------------------------------------#
+
 def convert_variable(
         InDataset,
         InVariable,
@@ -110,6 +118,9 @@ def convert_variable(
         # the data for writing
         InDatasetSlice[OutVariable] *= Scaling
 
+        # Map the slice to (-180, 180]
+        InDatasetSlice = map_to_pm180(InDatasetSlice)
+
         # Add commentary on this processing
         InDatasetSlice.attrs["history"] += f'{datetime.datetime.now}; ' +\
                 'separated into single years and modified variable names ' +\
@@ -144,6 +155,16 @@ def convert_wind_components_to_magnitude(
             engine = 'h5netcdf'
             )
 
+    # Set up the longitudes/latitudes to interpolate onto
+    Longitudes = np.linspace(
+            0.0,
+            360.0,
+            len(UWindDataset['lon']),
+            endpoint=False
+            )
+
+    Latitudes = np.linspace(-90.0, 90.0, len(UWindDataset['lat']))
+
     # Determine the time domain of the data, if not provided
     if YearRange is not None:
         StartTimeDomain = YearRange[0]
@@ -170,6 +191,19 @@ def convert_wind_components_to_magnitude(
                 drop=True
                 )
 
+        # "Interpolate" onto new coordinates
+        UWindSlice = UWindSlice.interp(
+                'lon'=Longitudes,
+                'lat'=Latitudes,
+                method='nearest'
+                )
+
+        VWindSlice = VWindSlice.interp(
+                'lon'=Longitudes,
+                'lat'=Latitudes,
+                method='nearest'
+                )
+
         # Convert to numpy arrays, then compute magnitude
         MagWindSlice = numpy.sqrt(
                 UWindSlice['uas'].to_numpy()**2 +\
@@ -183,6 +217,9 @@ def convert_wind_components_to_magnitude(
         # Now rename the variable, and make appropriate modifications to the
         # metadata
         MagWindSlice = UWindSlice.rename({'uas': 'wind'})
+
+        # Map the slice to (-180, 180]
+        MagWindSlice = map_to_pm180(MagWindSlice)
 
         # Set master attrs
         MagWindSlice.attrs['variable_id'] = 'wind_speed'
@@ -246,25 +283,13 @@ if __name__ == '__main__':
 
         Proc.starmap(convert_variable, ConvertInputs)
 
-    # for CABLEVar, ACCESSVar in VariablesToConvert.items():
-        # # Construct the input dataset location
-        # InDataset = InFileName(ACCESSVar)
+    # Handle the wind
+    UWindDataset = InFileName('uas')
+    VWindDataset = InFileName('vas')
 
-        # convert_variable(
-                # InDataset,
-                # ACCESSVar,
-                # args.output,
-                # CABLEVar,
-                # YearRange=YearRange
-                # )
-
-    # # Handle the wind
-    # UWindDataset = InFileName('uas')
-    # VWindDataset = InFileName('vas')
-
-    # convert_wind_components_to_magnitude(
-            # UWindDataset,
-            # VWindDataset,
-            # args.output,
-            # YearRange=YearRange
-            # )
+    convert_wind_components_to_magnitude(
+            UWindDataset,
+            VWindDataset,
+            args.output,
+            YearRange=YearRange
+            )
