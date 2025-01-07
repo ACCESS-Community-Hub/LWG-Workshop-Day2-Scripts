@@ -23,4 +23,4 @@ All the variables bar the surface wind speed have a 1 to 1 mapping between the A
 
 The time units are converted from days, which is the ACCESS-ESM1.5 default, to seconds, which the GSWP format in CABLE requires.
 
-The computation of the surface wind speed is yet to be confirmed, see discussion on the associated pull request.
+The wind speed is not available at 3 hour frequency, but the wind components are available on the u/v offset grids at 3 hour frequency. The components on the offset grids are moved to the common cell-centred grid via a nearest neighbour interpolation, and the Euclidean magnitude taken to compute the speed.
