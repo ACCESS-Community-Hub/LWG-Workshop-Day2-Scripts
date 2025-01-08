@@ -5,6 +5,7 @@ import multiprocessing
 import numpy
 
 import xarray
+import xesmf
 
 #-----------------------------------------------------------------------------#
 
@@ -155,6 +156,20 @@ def convert_wind_components_to_magnitude(
             engine = 'h5netcdf'
             )
 
+    # The input data is in days since ..., but we convert to seconds since
+    # by setting the time units attribute
+    StartTime = UWindDataset.time.encoding['units']
+    StartTimeAsSec = StartTime.replace('days', 'seconds')
+
+    # Set the units encoding
+    UWindDataset.time.encoding['units'] = StartTimeAsSec
+    if 'time_bnds' in UWindDataset.variables:
+        UWindDataset.time_bnds.encoding['units'] = StartTimeAsSec
+
+    VWindDataset.time.encoding['units'] = StartTimeAsSec
+    if 'time_bnds' in VWindDataset.variables:
+        VWindDataset.time_bnds.encoding['units'] = StartTimeAsSec
+
     # Set up the longitudes/latitudes to interpolate onto
     Longitudes = numpy.linspace(
             0.0,
@@ -164,6 +179,28 @@ def convert_wind_components_to_magnitude(
             )
 
     Latitudes = numpy.linspace(-90.0, 90.0, len(UWindDataset['lat']))
+    
+    # Create the template dataset to interpolate onto with xESMF
+    MagWindTemplate = xarray.Dataset(
+            coords=dict(
+                lat=('lat', Latitudes),
+                lon=('lon', Longitudes)
+                ),
+            )
+
+    # Build the regridders using xESMF
+    UWindRegridder = xesmf.Regridder(
+            UWindDataset,
+            MagWindTemplate,
+            'bilinear',
+            periodic=True
+            )
+    VWindRegridder = xesmf.Regridder(
+            VWindDataset,
+            MagWindTemplate,
+            'bilinear',
+            periodic=True
+            )
 
     # Determine the time domain of the data, if not provided
     if YearRange is not None:
@@ -191,57 +228,43 @@ def convert_wind_components_to_magnitude(
                 drop=True
                 )
 
-        # "Interpolate" onto new coordinates
-        UWindSlice = UWindSlice['uas'].interp(
-                lon=Longitudes,
-                lat=Latitudes,
-                method='nearest'
-                )
-
-        VWindSlice = VWindSlice['vas'].interp(
-                lon=Longitudes,
-                lat=Latitudes,
-                method='nearest'
-                )
-
-        # Convert to numpy arrays, then compute magnitude
         MagWindSlice = numpy.sqrt(
-                UWindSlice**2 +\
-                VWindSlice**2
+                UWindRegridder(UWindSlice)['uas'] ** 2 +\
+                VWindRegridder(VWindSlice)['vas'] ** 2
                 )
+
+        # This is now a DataArray- bind it to a Dataset
+        # Should it inherit all the metadata from the original U and V wind
+        # datasets, or an abridged dataset referring to the original data?
+        MagWindSlice = xarray.Dataset(
+                data_vars=dict(wind_speed=MagWindSlice),
+                coords=MagWindSlice.coords,
+                attrs=UWindDataset.attrs
+                )
+
+        # Append to the history attribute?
+        MagWindSlice.attrs['history'] += ' Wind speed computed by taking the ' +\
+                'Euclidean norm of the the eastward and northwind wind ' +\
+                'components, each regridded onto a grid common with the ' +\
+                'remaining variables using bilinear interpolation. Mapped ' +\
+                'from [0.0, 360.0) coordinates to (-180.0, 180.0].'
+
+        # We need to set all the variable attributes manually
+        MagWindSlice['wind_speed'].attrs = {
+                'standard_name' : 'wind_speed',
+                'long_name'     : 'Near-Surface Wind Speed',
+                'comment'       : 'Magnitude of the Euclidean norm of the ' +\
+                        'east-ward and north-ward wind components at 10m.',
+                'cell_methods'  : 'time: point'
+                }
 
         # Map the slice to (-180, 180]
         MagWindSlice = map_to_pm180(MagWindSlice)
 
-        # Create a new Dataset
-        MagWindDataset = xarray.Dataset(
-                data_vars=dict(
-                    wind=MagWindSlice
-                    ),
-                coords=dict(
-                    lat=('lat', Latitudes),
-                    lon=('lon', Longitudes),
-                    time=('time', UWindSlice['time'].data),
-                    ),
-                attrs=UWindSlice.attrs
-                )
-
-        # Modify the attributes to reflect the changes made
-        MagWindDataset['wind'].attrs = UWindSlice.attrs
-        MagWindDataset['wind'].attrs['standard_name'] = 'wind_speed'
-        MagWindDataset['wind'].attrs['long_name'] = 'Near-Surface Wind Speed'
-        MagWindDataset['wind'].attrs['comment'] = 'Computed by interpolating the ' +\
-                'eastward and northward wind components onto a common grid ' +\
-                'then computing the Euclidean magnitude.'
-
-        # Set the encoding to seconds
-        MagWindDataset['wind'].attrs['units'] = \
-            MagWindDataset['wind'].attrs['units'].replace('days', 'seconds')
-
         # Generate the filename to write to
         OutFileName = f'{OutTemplate}_windspeed_{str(Year)}.nc'
 
-        MagWindDataset.to_netcdf(OutFileName)
+        MagWindSlice.to_netcdf(OutFileName)
        
 #-----------------------------------------------------------------------------#
 
