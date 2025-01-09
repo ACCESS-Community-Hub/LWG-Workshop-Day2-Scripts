@@ -109,7 +109,6 @@ def select_points_from_landmask(Landmask, Points):
     # NearestPoints is tuple of arrays of (Distances, Indices) tuples
     for PtIndex, (Distance, Index) in enumerate(zip(Distances, Indexes)):
         # First, check whether the distance is less than a given tolerance
-        print(Distance, Index)
         if Distance > 5.0:
             print(f'Warning: the point {Points[PtIndex]} is more than 5 ' +\
                     'degrees from the nearest land point, so will be ignored.')
