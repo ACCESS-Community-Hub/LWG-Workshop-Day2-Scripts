@@ -82,17 +82,6 @@ def convert_variable(
             engine = 'h5netcdf'
             )
 
-    # Start by setting up the metadata
-    # The input data is in days since ..., but we convert to seconds since
-    # by setting the time units attribute
-    StartTime = InDataset.time.encoding['units']
-    StartTimeAsSec = StartTime.replace('days', 'seconds')
-
-    # Set the units encoding
-    InDataset.time.encoding['units'] = StartTimeAsSec
-    if 'time_bnds' in InDataset.variables:
-        InDataset.time_bnds.encoding['units'] = StartTimeAsSec
-
     # Rename the variable to one recogniseble by GSWP routines and set attrs
     InDataset = InDataset.rename(
             {InVariable: OutVariable}
@@ -105,6 +94,19 @@ def convert_variable(
     else:
         StartTimeDomain = InDataset.time[0].dt.year.item()
         EndTimeDomain = InDataset.time[-1].dt.year.item()
+
+    # The input data is in days since ..., but we convert to seconds since
+    # by setting the time units attribute
+    # The ACCESS-ESM data uses 1850 as the reference year, and when converting
+    # the time since reference to seconds, we actually hit the size limit for
+    # signed integers. To temporarily get around this, set the reference year
+    # to the start year of the selected slice
+    StartTimeAsSec = f'seconds since {StartTimeDomain}-01-01'
+
+    # Set the units encoding
+    InDataset.time.encoding['units'] = StartTimeAsSec
+    if 'time_bnds' in InDataset.variables:
+        InDataset.time_bnds.encoding['units'] = StartTimeAsSec
 
     # For each year, write a new file with that year's data
     for Year in range(StartTimeDomain, EndTimeDomain+1):
@@ -156,10 +158,19 @@ def convert_wind_components_to_magnitude(
             engine = 'h5netcdf'
             )
 
-    # The input data is in days since ..., but we convert to seconds since
-    # by setting the time units attribute
-    StartTime = UWindDataset.time.encoding['units']
-    StartTimeAsSec = StartTime.replace('days', 'seconds')
+    # Determine the time domain of the data, if not provided
+    if YearRange is not None:
+        StartTimeDomain = YearRange[0]
+        EndTimeDomain = YearRange[1]
+    else:
+        StartTimeDomain = UWindDataset.time[0].dt.year.item()
+        EndTimeDomain = UWindDataset.time[-1].dt.year.item()
+
+    # The ACCESS-ESM data uses 1850 as the reference year, and when converting
+    # the time since reference to seconds, we actually hit the size limit for
+    # signed integers. To temporarily get around this, set the reference year
+    # to the start year of the selected slice
+    StartTimeAsSec = f'seconds since {StartTimeDomain}-01-01'
 
     # Set the units encoding
     UWindDataset.time.encoding['units'] = StartTimeAsSec
@@ -201,14 +212,6 @@ def convert_wind_components_to_magnitude(
             'bilinear',
             periodic=True
             )
-
-    # Determine the time domain of the data, if not provided
-    if YearRange is not None:
-        StartTimeDomain = YearRange[0]
-        EndTimeDomain = YearRange[1]
-    else:
-        StartTimeDomain = UWindDataset.time[0].dt.year.item()
-        EndTimeDomain = UWindDataset.time[-1].dt.year.item()
 
     # Do the operations by year
     for Year in range(StartTimeDomain, EndTimeDomain+1):

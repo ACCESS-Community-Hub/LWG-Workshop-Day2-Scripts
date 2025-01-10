@@ -24,3 +24,5 @@ All the variables bar the surface wind speed have a 1 to 1 mapping between the A
 The time units are converted from days, which is the ACCESS-ESM1.5 default, to seconds, which the GSWP format in CABLE requires.
 
 The wind speed is not available at 3 hour frequency, but the wind components are available on the u/v offset grids at 3 hour frequency. The components on the offset grids are bilinearly interpolated (see the [xesmf documentation](https://xesmf.readthedocs.io/en/stable/notebooks/Dataset.html); unfortunately details on the interpolation implementation are lacking) to a grid common with the rest of the meteorological variables then the Euclidean norm is applied to compute the magnitude.
+
+The reference date for the time axis is changed to the first year selected for the given conversion. The time between reference date of 1850-01-01 and the start of the ACCESS-ESM1.5 data at 1960-01-01, when converted to seconds, is actually larger than the maximum signed integer value. The reference time is changed to reduce the magnitude of the values in the time axis.
