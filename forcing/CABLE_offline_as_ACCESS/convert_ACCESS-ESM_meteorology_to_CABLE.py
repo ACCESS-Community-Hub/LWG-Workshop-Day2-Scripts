@@ -240,7 +240,7 @@ def convert_wind_components_to_magnitude(
         # Should it inherit all the metadata from the original U and V wind
         # datasets, or an abridged dataset referring to the original data?
         MagWindSlice = xarray.Dataset(
-                data_vars=dict(wind_speed=MagWindSlice),
+                data_vars=dict(wind=MagWindSlice),
                 coords=MagWindSlice.coords,
                 attrs=UWindDataset.attrs
                 )
@@ -253,9 +253,10 @@ def convert_wind_components_to_magnitude(
                 'from [0.0, 360.0) coordinates to (-180.0, 180.0].'
 
         # We need to set all the variable attributes manually
-        MagWindSlice['wind_speed'].attrs = {
+        MagWindSlice['wind'].attrs = {
                 'standard_name' : 'wind_speed',
                 'long_name'     : 'Near-Surface Wind Speed',
+                'units'         : 'm/s',
                 'comment'       : 'Magnitude of the Euclidean norm of the ' +\
                         'east-ward and north-ward wind components at 10m.',
                 'cell_methods'  : 'time: point'
@@ -265,7 +266,7 @@ def convert_wind_components_to_magnitude(
         MagWindSlice = map_to_pm180(MagWindSlice)
 
         # Generate the filename to write to
-        OutFileName = f'{OutTemplate}_windspeed_{str(Year)}.nc'
+        OutFileName = f'{OutTemplate}_wind_{str(Year)}.nc'
 
         MagWindSlice.to_netcdf(OutFileName)
        
@@ -276,13 +277,13 @@ if __name__ == '__main__':
 
     # Define the mapping from ACCESS-ESM names to CABLE
     VariablesToConvert = {
-            'rainf' : 'pr',
-            'snow'  : 'prsn',
-            'lw'    : 'rlds',
-            'sw'    : 'rsds',
-            'ps'    : 'ps',
-            'qa'    : 'huss',
-            'ta'    : 'tas',
+            'Rainf'     : 'pr',
+            'Snowf'     : 'prsn',
+            'LWdown'    : 'rlds',
+            'SWdown'    : 'rsds',
+            'Psurf'     : 'ps',
+            'huss'      : 'huss',
+            'Tair'      : 'tas',
             }
     
     # Split the year range, if given
