@@ -84,7 +84,7 @@ def define_ncvar(Data, NCDataset, VarName, dims, attribs, RollDist):
             }
 
     # Assign the attributes
-    NCDataset[VarName].assign_attrs(attribs)
+    NCDataset[VarName] = NCDataset[VarName].assign_attrs(attribs)
 
 #----------------------------------------------------------------------------#    
 
@@ -124,8 +124,9 @@ def retrieve_landmask(FieldsFile, RollDist):
             # codes, but the second entry is full of 0s. Only take the first
             break
 
-    # Convert it to boolean (it seems to be a float initially?)
-    Landmask = Landmask.astype(bool)
+    # Convert it to boolean (it seems to be a float initially?), and invert it,
+    # since we want to use it where numpy.masked_where
+    Landmask = numpy.invert(Landmask.astype(bool))
 
     return Landmask
 
@@ -579,6 +580,31 @@ def scaling_conversions(
                 RollDist
                 )
 
+def apply_ice_fixes(NCDataset):
+    """Apply the hard-coded ice fixes, since the ACCESS-ESM1.5 restart file
+    does not contain the values actually used by the land model. See
+    https://github.com/CABLE-LSM/CABLE/pull/497#issuecomment-2589039055"""
+
+    # We want to use the DataArray.where method to keep everything not iveg=17
+    # as is, and set everywhere else to a hardcoded value
+    IceMask = NCDataset['iveg'] != 17
+
+    # Use the mask to modify select values for each parameter
+    NCDataset['isoil'] = NCDataset['isoil'].where(IceMask, 9)
+    NCDataset['clay'] = NCDataset['clay'].where(IceMask, 0.3)
+    NCDataset['silt'] = NCDataset['silt'].where(IceMask, 0.33)
+    NCDataset['sand'] = NCDataset['sand'].where(IceMask, 0.37)
+    NCDataset['swilt'] = NCDataset['swilt'].where(IceMask, 0.216)
+    NCDataset['sfc'] = NCDataset['sfc'].where(IceMask, 0.301)
+    NCDataset['ssat'] = NCDataset['ssat'].where(IceMask, 0.479)
+    NCDataset['bch'] = NCDataset['bch'].where(IceMask, 7.1)
+    NCDataset['hyds'] = NCDataset['hyds'].where(IceMask, 1e-6)
+    NCDataset['sucs'] = NCDataset['sucs'].where(IceMask, -0.153)
+    NCDataset['rhosoil'] = NCDataset['rhosoil'].where(IceMask, 910.0)
+    NCDataset['css'] = NCDataset['css'].where(IceMask, 2100.0)
+
+    return NCDataset
+
 #----------------------------------------------------------------------------#    
 
 if __name__ == "__main__":
@@ -957,5 +983,7 @@ if __name__ == "__main__":
             Mask,
             RollDist
             )
+
+    NCDataset = apply_ice_fixes(NCDataset)
 
     NCDataset.to_netcdf(args.output)

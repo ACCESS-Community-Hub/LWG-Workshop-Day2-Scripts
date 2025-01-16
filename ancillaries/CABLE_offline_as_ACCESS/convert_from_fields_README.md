@@ -55,3 +55,19 @@ The specifics of the conversion process for each of the variables is described i
 | cnsd | THERMAL CONDUCTIVITY AFTER TIMESTEP | Given units of W/m/K and long name "Soil thermal conductivity". |
 | css | N/A | N/A | N/A | Set according to isoil. 850.0 where isoil=2, 2100.0 where isoil=9. Given units of J/kg/K and long name "Soil specific heat capacity". |
 | albedo2 | SNOW-FREE ALBEDO OF SOIL | Given units of 1 and long name "Snow-free albedo of soil". |
+
+The handling of ice points is separate, as the ACCESS-ESM restart contains zeros for most of the soil parameters at ice points as they are set to prescribed values internally. The values used for the ice points are:
+
+* isoil: 9
+* rhosoil: 910.0
+* css: 2100.
+* bch: 7.1
+* clay: 0.3
+* css: 2100.0
+* hyds: 1e-6
+* sand: 0.37
+* sfc: 0.301
+* silt: 0.33
+* ssat: 0.479
+* sucs: -0.153
+* swilt: 0.216
