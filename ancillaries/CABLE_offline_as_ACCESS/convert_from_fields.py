@@ -25,8 +25,8 @@ def read_CLI_args():
     parser.add_argument(
             "-s",
             "--stash",
-            help="STASHmaster file to attach to the fields file",
-            default="/g/data/rp23/experiments/2024-03-12_CABLE4-dev/lw5085/CABLE-as-ACCESS/STASHmaster_A"
+            help="STASHmaster(s) to attach to the fields file",
+            default="/g/data/access/umdir/vn7.3/ctldata/STASHmaster/STASHmaster_A,/g/data/rp23/experiments/2024-03-12_CABLE4-dev/lw5085/CABLE-as-ACCESS/prefix.PRESM_A"
             )
 
     parser.add_argument(
@@ -199,7 +199,7 @@ def compute_iveg_and_dep_vars(
     
     # Soil Moisture (all layers)
     # Should retrieve stash entries for layer 1, 2, 3, 4, 5, 6
-    SoilMoistureStash = FieldsFile.stashmaster.by_regex("CABLE SOIL MOISTURE")
+    SoilMoistureStash = FieldsFile.stashmaster.by_regex("SOIL MOISTURE LAYER")
 
     # We know the desired size of the system from the dims- initialise it with
     # values of -1.0 for easier masking
@@ -248,7 +248,7 @@ def compute_iveg_and_dep_vars(
 
     # Now do soil temperature, in the same manner as soil moisture
     # Should retrieve stash entries for layer 1, 2, 3, 4, 5, 6
-    SoilTempStash = FieldsFile.stashmaster.by_regex("CABLE SOIL TEMPERATURE")
+    SoilTempStash = FieldsFile.stashmaster.by_regex("SOIL TEMPERATURE LAYER")
 
     # We know the desired size of the system from the dims- initialise it with
     # values of -1.0 for easier masking
@@ -334,7 +334,7 @@ def compute_iveg_and_dep_vars(
 
     # LAI
     # Retrieve the LAI stash item
-    LAIStash = FieldsFile.stashmaster.by_regex("CASA LEAF AREA INDEX")
+    LAIStash = FieldsFile.stashmaster.by_regex("LAI")
 
     # Should be a single entry- retrieve the stash code
     StashCode = list(LAIStash.values())[0].item
@@ -466,7 +466,7 @@ def convert_soilorder_to_int(
     """Convert the soil order from floating point to integer."""
 
     # Get the stash entry associated
-    SoilOrderStash = FieldsFile.stashmaster.by_regex("CASA SOIL ORDER")
+    SoilOrderStash = FieldsFile.stashmaster.by_regex("SOIL ORDER")
     StashCode = list(SoilOrderStash.values())[0].item
 
     # Get the field associated with the stash code
@@ -552,11 +552,12 @@ def scaling_conversions(
 
     # Current variables that fit this description are Ndep and hyds
     mappings = {
-            "CASA NITROGEN DEPOSITION": "Ndep",
+            "NITROGEN DEPOSITION": "Ndep",
             "SAT SOIL CONDUCTIVITY AFTER TIMESTEP": "hyds"
             }
 
     for UMVar, CABLEVar in mappings.items():
+        print(f"Converting {UMVar}")
         # Get the stash code
         VarStash = FieldsFile.stashmaster.by_regex(UMVar)
         StashCode = list(VarStash.values())[0].item
@@ -614,9 +615,20 @@ if __name__ == "__main__":
 
     # Start by opening the desired UM fields file and attaching the stash
     FieldsFile = mule.FieldsFile.from_file(args.input)
-    # Only take section 0, other sections are diagnostics
-    UMStash = mule.STASHmaster.from_file(args.stash).by_section(0)
-    FieldsFile.attach_stashmaster_info(UMStash)
+
+    # We currently build the ESM stash as a merge of the base stash and an
+    # extension. The args.stash may contain multiple comma separated stashes
+    ESMStashes = [mule.STASHmaster.from_file(SM) for SM in
+                args.stash.split(',')]
+    
+    # Merge the stashes into 1
+    ESMStash = mule.STASHmaster()
+    for Stash in ESMStashes:
+        ESMStash.update(Stash)
+
+    # Only take the first section- others are for diagnostic variables
+    ESMStash = ESMStash.by_section(0)
+    FieldsFile.attach_stashmaster_info(ESMStash)
 
     AreaFile = xarray.open_dataset(
             args.areafile,

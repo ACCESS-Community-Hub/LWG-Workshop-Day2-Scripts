@@ -12,7 +12,7 @@ python3 convert_from_fields.py --input(-i) <ESM_restart_file> --stash(-s) <UM_st
 
 The command line arguments are as follows:
 * --input: ACCESS-ESM restart file to convert. Defaults to "/g/data/vk83/configurations/inputs/access-esm1p5/modern/pre-industrial/restart/atmosphere/PI-02.astart-01010101".
-* --stash: Supplementary stash file to use. Defaults to "/g/data/rp23/experiments/2024-03-12\_CABLE4-dev/lw5085/CABLE-as-ACCESS/STASHmaster\_A".
+* --stash: Supplementary stash file(s) to use. The current approach is to use a allow a combination of stashes that will be merged, with each stash being comma separated. Defaults to "/g/data/access/umdir/vn7.3/ctldata/STASHmaster/STASHmaster_A,/g/data/rp23/experiments/2024-03-12\_CABLE4-dev/lw5085/CABLE-as-ACCESS/prefix.PRESM\_A".
 * --areafile: File containing grid cell area data. Defaults to "/g/data/fs38/publications/CMIP6/CMIP/CSIRO/ACCESS-ESM1-5/historical/r1i1p1f1/fx/areacella/gn/v20191115/areacella\_fx\_ACCESS-ESM1-5\_historical\_r1i1p1f1\_gn.nc"
 * --output: File name to write to. Defaults to "ACCESS-ESM1p5-1p875x1p25-gridinfo-CABLE.nc".
 * --create_landmask: Whether to write out the landmask to disk. Defaults to ```False```.
