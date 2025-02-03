@@ -105,16 +105,22 @@ def convert_variable(
 
     # Set the units encoding
     InDataset.time.encoding['units'] = StartTimeAsSec
-    if 'time_bnds' in InDataset.variables:
-        InDataset.time_bnds.encoding['units'] = StartTimeAsSec
+
+    # Drop the bounds variables, as xarray in its infinite wisdom changes them
+    # to time series variables when slicing
+    InDataset = InDataset.drop_vars(['lat_bnds', 'lon_bnds'])
+
+    # Time-averaged fields also have time_bnds, which we don't need
+    if 'time_bnds' in InDataset.keys():
+        InDataset = InDataset.drop_vars('time_bnds')
 
     # For each year, write a new file with that year's data
     for Year in range(StartTimeDomain, EndTimeDomain+1):
         # Select the data from that year
         InDatasetSlice = InDataset.sel(
                 time=slice(
-                    datetime.datetime(year=Year, month=1, day=1),
-                    datetime.datetime(year=Year+1, month=1, day=1))
+                    datetime.datetime(year=Year, month=1, day=1, minute=30),
+                    datetime.datetime(year=Year+1, month=1, day=1, minute=30))
                 )
         
         # Apply the scaling- even if our scaling is 1, it should concretize
@@ -132,7 +138,29 @@ def convert_variable(
         # Generate the filename to write to
         OutFileName = f'{OutTemplate}_{OutVariable}_{str(Year)}.nc'
 
-        InDatasetSlice.to_netcdf(OutFileName)
+        # Set the encoding
+        Encoding = {'chunksizes': (
+                InDatasetSlice.sizes['time'],
+                InDatasetSlice.sizes['lat'],
+                InDatasetSlice.sizes['lon']
+                )
+        }
+
+        # Remove preferred_chunks
+        for Variable in InDatasetSlice.variables.keys():
+            if 'preferred_chunks' in InDatasetSlice[Variable].encoding:
+                InDatasetSlice[Variable].encoding.pop('preferred_chunks')
+
+        InDatasetSlice.to_netcdf(
+                OutFileName,
+                encoding={
+                    'lat': InDatasetSlice['lat'].encoding,
+                    'lon': InDatasetSlice['lon'].encoding,
+                    'time': InDatasetSlice['time'].encoding,
+                    OutVariable: Encoding
+                },
+                engine='netcdf4'
+            )
 
 #-----------------------------------------------------------------------------#
 
@@ -174,12 +202,7 @@ def convert_wind_components_to_magnitude(
 
     # Set the units encoding
     UWindDataset.time.encoding['units'] = StartTimeAsSec
-    if 'time_bnds' in UWindDataset.variables:
-        UWindDataset.time_bnds.encoding['units'] = StartTimeAsSec
-
     VWindDataset.time.encoding['units'] = StartTimeAsSec
-    if 'time_bnds' in VWindDataset.variables:
-        VWindDataset.time_bnds.encoding['units'] = StartTimeAsSec
 
     # Set up the longitudes/latitudes to interpolate onto
     Longitudes = numpy.linspace(
@@ -217,16 +240,16 @@ def convert_wind_components_to_magnitude(
     for Year in range(StartTimeDomain, EndTimeDomain+1):
         UWindSlice = UWindDataset.sel(
                 time=slice(
-                    datetime.datetime(year=Year, month=1, day=1),
-                    datetime.datetime(year=Year+1, month=1, day=1)
+                    datetime.datetime(year=Year, month=1, day=1, minute=30),
+                    datetime.datetime(year=Year+1, month=1, day=1, minute=30)
                     ),
                 drop=True
                 )
 
         VWindSlice = VWindDataset.sel(
                 time=slice(
-                    datetime.datetime(year=Year, month=1, day=1),
-                    datetime.datetime(year=Year+1, month=1, day=1)
+                    datetime.datetime(year=Year, month=1, day=1, minute=30),
+                    datetime.datetime(year=Year+1, month=1, day=1, minute=30)
                     ),
                 drop=True
                 )
@@ -264,6 +287,13 @@ def convert_wind_components_to_magnitude(
 
         # Map the slice to (-180, 180]
         MagWindSlice = map_to_pm180(MagWindSlice)
+
+        # Set the chunking strategy
+        MagWindSlice['wind'].encoding['chunksizes'] = (
+                MagWindSlice.sizes['time'],
+                MagWindSlice.sizes['lat'],
+                MagWindSlice.sizes['lon']
+                )
 
         # Generate the filename to write to
         OutFileName = f'{OutTemplate}_wind_{str(Year)}.nc'
