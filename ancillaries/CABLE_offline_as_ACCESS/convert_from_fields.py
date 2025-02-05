@@ -554,7 +554,6 @@ def scaling_conversions(
             }
 
     for UMVar, CABLEVar in mappings.items():
-        print(f"Converting {UMVar}")
         # Get the stash code
         VarStash = FieldsFile.stashmaster.by_regex(UMVar)
         StashCode = list(VarStash.values())[0].item
