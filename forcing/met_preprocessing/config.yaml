@@ -1,0 +1,7 @@
+directories:
+  - /g/data/gh70/ANUClimate/v2-0/stable/month/tavg/1960/ANUClimate_v2-0_tavg_monthly_196001.nc
+  - /g/data/gh70/ANUClimate/v2-0/stable/month/rain/1960/ANUClimate_v2-0_rain_monthly_196001.nc
+  - /g/data/gh70/ANUClimate/v2-0/stable/month/srad/1960/ANUClimate_v2-0_srad_monthly_196001.nc
+  - /g/data/gh70/ANUClimate/v2-0/stable/month/vpd/1960/ANUClimate_v2-0_vpd_monthly_196001.nc
+
+output_file: temp.nc
