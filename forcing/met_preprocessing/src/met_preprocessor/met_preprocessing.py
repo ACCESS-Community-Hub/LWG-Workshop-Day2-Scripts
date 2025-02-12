@@ -95,6 +95,7 @@ def run_met():
     print(f"Loading combined dataset from {file_list}")
     dataset = xr.open_mfdataset(file_list, compat="override", coords="minimal")
     print("Loaded combined dataset")
+    print(dataset)
 
     # Rename parameters
     param_criteria = get_rename_param_criteria(list(dataset.keys()), param_map)

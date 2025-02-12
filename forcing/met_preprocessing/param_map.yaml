@@ -37,7 +37,8 @@ Rainf:
   input_param:
     - rain
   unit:
-    kg m-2 s-1
+    mm s-1
+    # kg m-2 s-1 (JULES)
 
   # Wind:
   #   unit:
@@ -58,6 +59,8 @@ vpd:
 
 elevation:
   type: conversion
+  input_param:
+    - dem01
   unit:
     m
 
@@ -83,17 +86,27 @@ PSurf:
     - deps:
         Tair,elevation
       func:
-        calc_lwdown_swinbank
+        calc_psurf
   unit:
     Pa
 Snowf:
   type: optional
   unit:
     mm s-1
+  calc:
+    - deps:
+        Tair,Rainf
+      func:
+        calc_snow
+
 CO2air:
   type: optional
   unit:
     ppm
+  # calc:
+  #   - deps: ""
+  #     func:
+  #       cons_co2
 
 patchfrac:
   type: optional

@@ -39,33 +39,32 @@ class UnitConversion:
         self.contexts[param] = pint.Context(param)
         units.add_context(self.contexts[param])
 
-    def _convert_units(self, da: DataArray, new_unit: str) -> DataArray:
+    @staticmethod
+    def _convert_units(da: DataArray, new_unit: str) -> DataArray:
         # Prevent unnecessarily quantify-ing (expensive operation)
         if new_unit != da.units:
-            da_q = da.metpy.quantify()
-            da_q = da_q.metpy.convert_units(new_unit)
-            da_q = da_q.metpy.dequantify()
-        return da_q
+            da = da.metpy.quantify()
+            da = da.metpy.convert_units(new_unit)
+            da = da.metpy.dequantify()
+        return da
+
+    @staticmethod
+    def _apply_month_conv_group(da, self, daily_units):
+        # TODO: Remove 0 idx
+        # TODO: Remove self
+        n_days = da.time[0].dt.days_in_month
+        self.contexts["month"].redefine(f"month = {n_days} * days")
+        with units.context("month"):
+            return self._convert_units(da, str(daily_units))
 
     def _monthly_conversions(self, da: DataArray) -> DataArray:
         """Convert monthly to daily data."""
         print(f"Monthly conversions for {da.name}")
         daily_units = pint.util.to_units_container(units(da.units))
         daily_units = daily_units.rename("month", "day")
-        for monthly_days in range(28, 32):
-            da_time = da.isel(time=da.time.dt.days_in_month == monthly_days)
-            scaling_factor = monthly_days
-            self.contexts["month"].redefine(f"month = {scaling_factor} * days")
-            if da_time.time.size == 0:
-                continue
-            time_filter_dict = dict(time=da_time.time)
-            with units.context("month"):
-                da.loc[time_filter_dict] = self._convert_units(
-                    da.loc[time_filter_dict],
-                    str(daily_units),
-                )
-        da.attrs["units"] = str(daily_units)
-        return da
+        gb = da.groupby("time.days_in_month")
+        da_days = gb.map(self._apply_month_conv_group, (self, daily_units))
+        return da_days
 
     def convert_param(self, da: DataArray, out_units: str) -> DataArray:
         """Convert parameter into necessary units."""
