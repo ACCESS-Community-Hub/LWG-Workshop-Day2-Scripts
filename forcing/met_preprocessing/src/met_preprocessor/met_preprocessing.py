@@ -56,22 +56,36 @@ def process_dependencies(param_map):
     return dependencies
 
 
+def cycle_check(node: str, visited: dict[str, bool], adj_list: list[list[str]]):
+    if visited[node]:
+        return True
+
+
+def replace_tup(tup_list, val, new_tup):
+    for i, tup in enumerate(tup_list):
+        if tup[0] == val:
+            tup_list[i] = new_tup
+            return tup_list
+    return tup_list + [new_tup]
+
+
 def order_load_dep(res, dependencies, input_list):
     """
     Given a DAG, convert which order to calculate values.
     TODO: Cycle check - basic idea of converting list of lists into a set and checking visited
     nodes
-    TODO: Algorithm works for DAG not maintaining ordering
     Eg: input_list = {1, 3}  dependencies = {2 : [[1, 4], [1, 3]], 4 : 1}
-    Here answer should be {4 : [1] , 2 : [1, 4]}, but it will give out {2 : [1, 3], 4 : 1}
+    Here answer should be {4 : [1] , 2 : [1, 4]} based on priority
     """
     for param, dep_list in dependencies.items():
-        for deps, func in dep_list:
+        for i, (deps, func) in enumerate(dep_list):
             if set(deps).issubset(set(input_list)):
-                dependencies.pop(param)
-                return order_load_dep(
-                    res + [(param, deps, func)], dependencies, input_list + [param]
-                )
+                # Remove on/after param
+                dependencies[param] = dependencies[param][:i]
+                # Replace param in res if present otherwise append
+                updated_res = replace_tup(res, param, (param, deps, func))
+                return order_load_dep(updated_res, dependencies, input_list + [param])
+    # If no extra dependencies found, then return the accumulated result
     return res
 
 
@@ -131,7 +145,7 @@ def run_met():
         )
 
     # Only keep standard/optional variables (not including index variables)
-    dataset.drop_vars(
+    dataset = dataset.drop_vars(
         list(
             filter(
                 lambda x: param_map.get(x, {}).get("type", "")

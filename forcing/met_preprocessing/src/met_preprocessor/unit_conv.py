@@ -23,6 +23,7 @@ class UnitConversion:
         units.define("Celsius = degC")
         units.define("HPa = 100 Pa")
 
+        # REVIEW: Concurrency issue on ctx if parallized
         for param in params:
             self._add_new_empty_context(param)
 
@@ -49,21 +50,23 @@ class UnitConversion:
         return da
 
     @staticmethod
-    def _apply_month_conv_group(da, self, daily_units):
-        # TODO: Remove 0 idx
-        # TODO: Remove self
+    def _apply_month_conv_group(da: DataArray, month_ctx, daily_units):
+        assert da.size != 0
         n_days = da.time[0].dt.days_in_month
-        self.contexts["month"].redefine(f"month = {n_days} * days")
+        month_ctx.redefine(f"month = {n_days} * days")
         with units.context("month"):
-            return self._convert_units(da, str(daily_units))
+            return UnitConversion._convert_units(da, str(daily_units))
 
     def _monthly_conversions(self, da: DataArray) -> DataArray:
         """Convert monthly to daily data."""
         print(f"Monthly conversions for {da.name}")
-        daily_units = pint.util.to_units_container(units(da.units))
-        daily_units = daily_units.rename("month", "day")
+        monthly_units = pint.util.to_units_container(units(da.units))
+        daily_units = monthly_units.rename("month", "day")
         gb = da.groupby("time.days_in_month")
-        da_days = gb.map(self._apply_month_conv_group, (self, daily_units))
+        da_days = gb.map(
+            self._apply_month_conv_group,
+            (self.contexts["month"], daily_units),
+        )
         return da_days
 
     def convert_param(self, da: DataArray, out_units: str) -> DataArray:
