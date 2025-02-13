@@ -1,0 +1,115 @@
+# Standard Params
+
+Tair:
+  type: standard
+  input_param:
+    - tavg
+    - temp
+  unit:
+    kelvin
+SWDown:
+  type: standard
+  input_param:
+    - srad
+  unit:
+    W m-2
+Qair:
+  type: standard
+  input_param:
+    - Qair
+  unit:
+    kg kg-1
+  calc:
+    - deps:
+        vp,vpd,Tair
+      func:
+        vp_vpd_tair_sh
+    - deps:
+        vp,Tair
+      func:
+        vp_tair_sh
+    - deps:
+        vpd,Tair
+      func:
+        vpd_tair_sh
+Rainf:
+  type: standard
+  input_param:
+    - rain
+  unit:
+    mm s-1
+    # kg m-2 s-1 (JULES)
+
+  # Wind:
+  #   unit:
+  #     m s-1
+  # Wind_E:
+  #   unit:
+  #     m s-1
+  # Wind_N:
+  #   unit:
+  #     m s-1
+
+# In between params
+vpd:
+  type: 
+    conversion
+  input_param:
+    - vpd
+
+elevation:
+  type: conversion
+  input_param:
+    - dem01
+  unit:
+    m
+
+tmax:
+  type: conversion
+
+tmin:
+  type: conversion
+
+# Optional Params
+LWDown:
+  type: optional
+  calc:
+    - deps:
+        Tair
+      func:
+        calc_lwdown_swinbank
+  unit:
+    W m-2
+PSurf:
+  type: optional
+  calc:
+    - deps:
+        Tair,elevation
+      func:
+        calc_psurf
+  unit:
+    Pa
+Snowf:
+  type: optional
+  unit:
+    mm s-1
+  calc:
+    - deps:
+        Tair,Rainf
+      func:
+        calc_snow
+
+CO2air:
+  type: optional
+  unit:
+    ppm
+  # calc:
+  #   - deps: ""
+  #     func:
+  #       cons_co2
+
+patchfrac:
+  type: optional
+  unit:
+    dimensionless
+    # - Tair
